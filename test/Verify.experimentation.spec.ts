@@ -176,7 +176,7 @@ const didKeyCredential = {
 
 
 describe('any test we like', () => {
-  it.only('tests', async () => {
+  it.skip('tests', async () => {
     // change this however you like to test things
     // const originalVC = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/dataIntegrityProof/didKey/legacyRegistry-noStatus-notExpired-withSchema.json')
     const vc = testVC as any;
