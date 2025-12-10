@@ -11,13 +11,16 @@ import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
 import { addSchemaCheckToVerificationResponse } from './schemaCheck.js'
 import { extractCredentialsFrom } from './extractCredentialsFrom.js';
 
-import { 
-  PRESENTATION_ERROR, UNKNOWN_ERROR, INVALID_JSONLD, NO_VC_CONTEXT, 
-  INVALID_CREDENTIAL_ID, NO_PROOF, STATUS_LIST_NOT_FOUND, 
-  HTTP_ERROR_WITH_SIGNATURE_CHECK, DID_WEB_UNRESOLVED, 
-  INVALID_SIGNATURE } from './constants/errors.js';
+import {
+  PRESENTATION_ERROR, UNKNOWN_ERROR, INVALID_JSONLD, NO_VC_CONTEXT,
+  INVALID_CREDENTIAL_ID, NO_PROOF, STATUS_LIST_NOT_FOUND,
+  HTTP_ERROR_WITH_SIGNATURE_CHECK, DID_WEB_UNRESOLVED,
+  INVALID_SIGNATURE,
+  STATUS_LIST_EXPIRED,
+  UNKNOWN_STATUS_LIST_ERROR
+} from './constants/errors.js';
 import { SIGNATURE_INVALID, SIGNATURE_VALID, SIGNATURE_UNSIGNED, REVOCATION_STATUS_STEP_ID } from './constants/verificationSteps.js';
-import { ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, VERIFICATION_ERROR } from './constants/external.js';
+import { EXPIRED_ERROR, ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, VERIFICATION_ERROR } from './constants/external.js';
 
 import { Credential } from './types/credential.js';
 import { VerificationResponse, VerificationStep, PresentationVerificationResponse, PresentationSignatureResult } from './types/result.js';
@@ -80,7 +83,7 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
 }
 
 
-export async function verifyCredential({ credential, knownDIDRegistries}: { credential: Credential, knownDIDRegistries: object}): Promise<VerificationResponse> {
+export async function verifyCredential({ credential, knownDIDRegistries }: { credential: Credential, knownDIDRegistries: object }): Promise<VerificationResponse> {
   try {
     // null unless credential has a status
     const statusChecker = getCredentialStatusChecker(credential)
@@ -92,6 +95,7 @@ export async function verifyCredential({ credential, knownDIDRegistries}: { cred
       checkStatus: statusChecker,
       verifyMatchingIssuers: false
     });
+    // console.log(JSON.stringify(verificationResponse,null,2))
     const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries)
     return adjustedResponse;
   } catch (error) {
@@ -107,7 +111,7 @@ async function transformResponse(verificationResponse: any, credential: Credenti
     return fatalCredentialError
   }
 
-  handleAnyStatusError({ verificationResponse, statusResult: verificationResponse.statusResult });
+  handleAnyStatusError({ verificationResponse });
 
   const fatalSignatureError = handleAnySignatureError({ verificationResponse, credential })
   if (fatalSignatureError) {
@@ -117,7 +121,7 @@ async function transformResponse(verificationResponse: any, credential: Credenti
   const { issuer } = credential
   await addTrustedIssuersToVerificationResponse({ verificationResponse, knownDIDRegistries, issuer })
 
-  await addSchemaCheckToVerificationResponse({verificationResponse, credential})
+  await addSchemaCheckToVerificationResponse({ verificationResponse, credential })
 
   // remove things we don't need from the result or that are duplicated elsewhere
   delete verificationResponse.results
@@ -171,21 +175,36 @@ function handleAnyFatalCredentialErrors(credential: Credential): VerificationRes
   return null
 }
 
-function handleAnyStatusError({ verificationResponse }: {
-  verificationResponse: any,
-  statusResult: any
-}): void {
+function handleAnyStatusError({ verificationResponse }: { verificationResponse: any}): void {
   const statusResult = verificationResponse.statusResult
-  if (statusResult?.error?.cause?.message?.startsWith(NOT_FOUND_ERROR)) {
+ // console.log("STATUS RESULT:")
+ // console.log(statusResult?.error?.cause?.message)
+  if (statusResult?.error) {
+    
+    let error
+   if (statusResult?.error?.cause?.message?.startsWith(NOT_FOUND_ERROR)) {
+        error = {
+          name: STATUS_LIST_NOT_FOUND,
+          message: statusResult.error.cause.message
+        }
+    } else if (statusResult?.error?.cause?.message?.includes(EXPIRED_ERROR)) {
+        error = {
+          name: STATUS_LIST_EXPIRED,
+          message: "The status list verifiable credential has expired."
+        }
+      } else {
+        error = {
+          name: UNKNOWN_STATUS_LIST_ERROR,
+          message: statusResult.error.cause.message ?? "The status list couldnt' be verified."
+        }
+      }  
     const statusStep = {
       "id": REVOCATION_STATUS_STEP_ID,
-      "error": {
-        name: STATUS_LIST_NOT_FOUND,
-        message: statusResult.error.cause.message
-      }
+      error
     };
     (verificationResponse.log ??= []).push(statusStep)
   }
+
 }
 
 function handleAnySignatureError({ verificationResponse, credential }: { verificationResponse: any, credential: Credential }): null | VerificationResponse {
@@ -202,7 +221,7 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
       const httpError = verificationResponse.error.errors.find((error: any) => error.name === 'HTTPError')
       // or a json-ld parsing error
       const jsonLdError = verificationResponse.error.errors.find((error: any) => error.name === 'jsonld.ValidationError')
-      
+
       if (httpError) {
         fatalErrorMessage = 'An http error prevented the signature check.'
         errorName = HTTP_ERROR_WITH_SIGNATURE_CHECK
@@ -217,13 +236,13 @@ function handleAnySignatureError({ verificationResponse, credential }: { verific
           }
         }
       } else if (jsonLdError) {
-        const errors = verificationResponse.error.errors.map((error:any)=>{
+        const errors = verificationResponse.error.errors.map((error: any) => {
           // need to rename the stack property to stackTrace to fit with old error structure
           error.stackTrace = error.stack;
           delete error.stack;
           return error
         })
-        return {credential, errors}
+        return { credential, errors }
       } else {
         // not an http or json-ld error, so likely bad signature
         fatalErrorMessage = 'The signature is not valid.'
