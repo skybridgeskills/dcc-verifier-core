@@ -18,10 +18,12 @@ import {
   INVALID_SIGNATURE,
   STATUS_LIST_EXPIRED,
   UNKNOWN_STATUS_LIST_ERROR,
-  STATUS_LIST_SIGNATURE_ERROR
+  STATUS_LIST_SIGNATURE_ERROR,
+  STATUS_LIST_NOT_YET_VALID_ERROR,
+  STATUS_LIST_TYPE_ERROR
 } from './constants/errors.js';
 import { SIGNATURE_INVALID, SIGNATURE_VALID, SIGNATURE_UNSIGNED, REVOCATION_STATUS_STEP_ID } from './constants/verificationSteps.js';
-import { EXPIRED_ERROR, ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, STATUS_SIGNATURE_ERROR, VERIFICATION_ERROR } from './constants/external.js';
+import { EXPIRED_ERROR, ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, STATUS_NOT_YET_VALID_ERROR, STATUS_SIGNATURE_ERROR, STATUS_TYPE_ERROR, VERIFICATION_ERROR } from './constants/external.js';
 
 import { Credential } from './types/credential.js';
 import { VerificationResponse, VerificationStep, PresentationVerificationResponse, PresentationSignatureResult } from './types/result.js';
@@ -178,8 +180,6 @@ function handleAnyFatalCredentialErrors(credential: Credential): VerificationRes
 
 function handleAnyStatusError({ verificationResponse }: { verificationResponse: any }): void {
   const statusResult = verificationResponse.statusResult
-  // console.log("STATUS RESULT:")
-  // console.log(statusResult?.error?.cause?.message)
   if (statusResult?.error) {
     let error
     if (statusResult?.error?.cause?.message?.startsWith(NOT_FOUND_ERROR)) {
@@ -196,6 +196,11 @@ function handleAnyStatusError({ verificationResponse }: { verificationResponse: 
       error = {
         name: STATUS_LIST_SIGNATURE_ERROR,
         message: "The signature on the status list is invalid."
+      }
+    } else if (statusResult?.error?.message?.startsWith(STATUS_TYPE_ERROR)) {
+      error = {
+        name: STATUS_LIST_TYPE_ERROR,
+        message: 'Status list credential type must include "BitstringStatusListCredential".'
       }
     } else {
       error = {
