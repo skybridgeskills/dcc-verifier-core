@@ -7,6 +7,8 @@ export const NO_PROOF = 'no_proof'
 export const HTTP_ERROR_WITH_SIGNATURE_CHECK = 'http_error_with_signature_check'
 export const DID_WEB_UNRESOLVED = 'did_web_unresolved'
 export const INVALID_SIGNATURE = 'invalid_signature'
+
 export const STATUS_LIST_NOT_FOUND = 'status_list_not_found'
 export const STATUS_LIST_EXPIRED = 'status_list_expired'
 export const UNKNOWN_STATUS_LIST_ERROR = 'status_list_error'
+export const STATUS_LIST_SIGNATURE_ERROR = 'status_list_signature_error'

@@ -17,10 +17,11 @@ import {
   HTTP_ERROR_WITH_SIGNATURE_CHECK, DID_WEB_UNRESOLVED,
   INVALID_SIGNATURE,
   STATUS_LIST_EXPIRED,
-  UNKNOWN_STATUS_LIST_ERROR
+  UNKNOWN_STATUS_LIST_ERROR,
+  STATUS_LIST_SIGNATURE_ERROR
 } from './constants/errors.js';
 import { SIGNATURE_INVALID, SIGNATURE_VALID, SIGNATURE_UNSIGNED, REVOCATION_STATUS_STEP_ID } from './constants/verificationSteps.js';
-import { EXPIRED_ERROR, ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, VERIFICATION_ERROR } from './constants/external.js';
+import { EXPIRED_ERROR, ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, STATUS_SIGNATURE_ERROR, VERIFICATION_ERROR } from './constants/external.js';
 
 import { Credential } from './types/credential.js';
 import { VerificationResponse, VerificationStep, PresentationVerificationResponse, PresentationSignatureResult } from './types/result.js';
@@ -175,29 +176,33 @@ function handleAnyFatalCredentialErrors(credential: Credential): VerificationRes
   return null
 }
 
-function handleAnyStatusError({ verificationResponse }: { verificationResponse: any}): void {
+function handleAnyStatusError({ verificationResponse }: { verificationResponse: any }): void {
   const statusResult = verificationResponse.statusResult
- // console.log("STATUS RESULT:")
- // console.log(statusResult?.error?.cause?.message)
+  // console.log("STATUS RESULT:")
+  // console.log(statusResult?.error?.cause?.message)
   if (statusResult?.error) {
-    
     let error
-   if (statusResult?.error?.cause?.message?.startsWith(NOT_FOUND_ERROR)) {
-        error = {
-          name: STATUS_LIST_NOT_FOUND,
-          message: statusResult.error.cause.message
-        }
+    if (statusResult?.error?.cause?.message?.startsWith(NOT_FOUND_ERROR)) {
+      error = {
+        name: STATUS_LIST_NOT_FOUND,
+        message: statusResult.error.cause.message
+      }
     } else if (statusResult?.error?.cause?.message?.includes(EXPIRED_ERROR)) {
-        error = {
-          name: STATUS_LIST_EXPIRED,
-          message: "The status list verifiable credential has expired."
-        }
-      } else {
-        error = {
-          name: UNKNOWN_STATUS_LIST_ERROR,
-          message: statusResult.error.cause.message ?? "The status list couldnt' be verified."
-        }
-      }  
+      error = {
+        name: STATUS_LIST_EXPIRED,
+        message: "The status list verifiable credential has expired."
+      }
+    } else if (statusResult?.error?.cause?.message?.startsWith(STATUS_SIGNATURE_ERROR)) {
+      error = {
+        name: STATUS_LIST_SIGNATURE_ERROR,
+        message: "The signature on the status list is invalid."
+      }
+    } else {
+      error = {
+        name: UNKNOWN_STATUS_LIST_ERROR,
+        message: statusResult.error.cause.message ?? "The status list couldn't be verified."
+      }
+    }
     const statusStep = {
       "id": REVOCATION_STATUS_STEP_ID,
       error
