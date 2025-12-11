@@ -6,7 +6,7 @@ import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
 import { SCHEMA_ENTRY_ID } from '../src/constants/verificationSteps.js';
 
 import { EXPIRATION_STEP_ID, REVOCATION_STATUS_STEP_ID } from '../src/constants/verificationSteps.js';
-import { DID_WEB_UNRESOLVED, INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, STATUS_LIST_NOT_FOUND, STATUS_LIST_EXPIRED, STATUS_LIST_SIGNATURE_ERROR, STATUS_LIST_TYPE_ERROR } from '../src/constants/errors.js';
+import { DID_WEB_UNRESOLVED, INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, STATUS_LIST_NOT_FOUND, STATUS_LIST_EXPIRED, STATUS_LIST_SIGNATURE_ERROR, STATUS_LIST_TYPE_ERROR, STATUS_LIST_NOT_YET_VALID_ERROR } from '../src/constants/errors.js';
 import { getVCv2DoubleSigWithBadStatusUrl } from '../src/test-fixtures/vc.js';
 import { getExpectedVerifiedResult } from '../src/test-fixtures/expectedResults.js';
 
@@ -71,7 +71,7 @@ describe('status checks', () => {
             expect(result).to.have.property("credential").that.equals(credential)
         })
 
-        it.only('is missing BitstringStatusListCredential type', async () => {
+        it('is missing BitstringStatusListCredential type', async () => {
             const credential = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-missingTypeStatus-noExpiry.json')
             const expectedResult = getExpectedVerifiedResult({ credential, withStatus: false })
             expectedResult.log?.push(
@@ -86,6 +86,23 @@ describe('status checks', () => {
             expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
             expect(result).to.have.property("credential").that.equals(credential)
         })
+
+        it('is not yet valid', async () => {
+            const credential = await fetchVC('https://digitalcredentials.github.io/vc-test-fixtures/verifiableCredentials/v2/ed25519/didKey/legacy-notYetValidStatus-noExpiry.json')
+            const expectedResult = getExpectedVerifiedResult({ credential, withStatus: false })
+            expectedResult.log?.push(
+              {
+                "id": REVOCATION_STATUS_STEP_ID,
+                "error": {
+                  "name": STATUS_LIST_NOT_YET_VALID_ERROR,
+                  "message": 'The validFrom date on the status list credential is in the future.'
+                }
+              })
+            const result = await verifyCredential({ credential, knownDIDRegistries })
+            expect(result).to.have.property('log').that.deep.equalInAnyOrder(expectedResult.log);
+            expect(result).to.have.property("credential").that.equals(credential)
+        })
+
 })
 
 async function fetchVC(url: string): Promise<Credential> {

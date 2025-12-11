@@ -202,10 +202,15 @@ function handleAnyStatusError({ verificationResponse }: { verificationResponse: 
         name: STATUS_LIST_TYPE_ERROR,
         message: 'Status list credential type must include "BitstringStatusListCredential".'
       }
+    } else if (statusResult?.error?.cause?.message?.includes(STATUS_NOT_YET_VALID_ERROR)) {
+      error = {
+        name: STATUS_LIST_NOT_YET_VALID_ERROR,
+        message: 'The validFrom date on the status list credential is in the future.'
+      }
     } else {
       error = {
         name: UNKNOWN_STATUS_LIST_ERROR,
-        message: statusResult.error.cause.message ?? "The status list couldn't be verified."
+        message: statusResult.error.cause?.message ?? "The status list couldn't be verified."
       }
     }
     const statusStep = {
