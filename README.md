@@ -175,6 +175,10 @@ Variations and errors are covered next...
 
 There are three general flavours of result that might be returned:
 
+- all checks were conclusive
+- verification was partially successful
+- verification was fatal
+
 1. <b>all checks were conclusive</b>
 
 All of the checks were run *conclusively*, meaning that we determined whether each of the four steps in verification (signature, expiry, revocation, known issuer) was true or false.
@@ -222,7 +226,7 @@ A conclusive verification might look like this example where all steps returned 
 }
 ```
 
-Note that an invalid signature is considered fatal because it means that the revocation status, expiry data, or issuer id may have been tampered with, and so we can't say anything conclusive about any of them.
+An invalid signature is considered fatal, rather than conclusive (even though in a sense it conclusively rejects the entire credential) because an invalid signature means that the revocation status, expiry data, or issuer id may have been tampered with, and so we can't say anything conclusive about any of those steps, and can't even check them because they could be fraudulent.
 
 And here is a slightly different verification result where we have still made conclusive determinations about each step, and all are true except for the expiry:
 
@@ -268,23 +272,21 @@ And here is a slightly different verification result where we have still made co
 
 2. <b> partially successful verification</b>
 
-A verification might partly succeed if it can verify:
+A verification might partly succeed if it can conclusively determine some of the steps - most 
+importantly that the credential hasn't been tampered with - but can't conclusively verify (as true or false) some other steps.
 
-* the signature
-* the expiry date
+A good example is if there are network problems and the verifier can't retrieve things an issuer registry, and so can't say whether the did used to sign the VC is listed in the registry. It might be, but it might not be.
 
-But can't retrieve (from the network) any one of:
+Another example is the revocation status - if we can't retrieve the status list from the network then we again 
+can't see one way or the other if the credential has been revoked. It might have been, it might not have been.
 
-* the revocation status
-* an issuer registry from our list of trusted issuers
-
-which are needed to verify the revocation status and issuer identity.
+The revocation status is an especially interesting example because the status list is itself a Verifiable Credential, which could have expired, been revoked, or been tampered with. And if so, then we again can't say anything about the status of the VC we are trying to to verify because the status list is not valid.
 
 For the valid_signature and revocation_status steps, if we can't conclusively verify one way or the other (true or false) we return an 'error' propery rather than a 'valid' property.
 
 For the registered_issuer step we always return false if the issuer isn't found in a loaded registry, but with the caveat that if the 'registriesNotLoaded' property does contain one or more registries, then the credential *might* have been in one of those registries. It is up to the consumer of the result to decide how to deal with that.
 
-A partially successful verification might look like this example, where we couldn't retrieve the status list or one of the registries:
+A partially successful verification might look like this example, where we couldn't retrieve one of the registries:
 
 ```
 {
@@ -297,13 +299,6 @@ A partially successful verification might look like this example, where we could
     {
       "id": "expiration",
       "valid": true
-    },
-    {
-      "id": "revocation_status",
-      "error": {
-            "name": "'status_list_not_found'",
-            "message": "Could not retrieve the revocation status list."
-      }   
     },
     {
       "id": "registered_issuer",
@@ -339,6 +334,94 @@ A partially successful verification might look like this example, where we could
     }
   ]
 }
+```
+
+Or for a status list that couldn't be retrieved:
+
+```
+{
+  "credential": {the supplied vc - left out here for brevity/clarity},
+  "log": [
+    {
+      "id": "valid_signature",
+      "valid": true
+    },
+    {
+      "id": "expiration",
+      "valid": true
+    },
+    {
+      "id": "revocation_status",
+      "error": {
+            "name": "'status_list_not_found'",
+            "message": "Could not retrieve the revocation status list."
+      }   
+    },
+    {
+      "id": "registered_issuer",
+      "valid": true,
+      "matchingIssuers": [
+        {
+          "issuer": {
+            "federation_entity": {
+              "organization_name": "DCC did:web test",
+              "homepage_uri": "https://digitalcredentials.mit.edu",
+              "location": "Cambridge, MA, USA"
+            }
+          },
+          "registry": {
+            "name": "DCC Sandbox Registry",
+            "type": "dcc-legacy",
+            "url": "https://digitalcredentials.github.io/sandbox-registry/registry.json"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+The status list errors that we return include:
+```
+  "error": {
+            "name": "status_list_not_found",
+            "message": "Could not retrieve the revocation status list."
+      }  
+```
+
+```
+  "error": {
+            "name": "status_list_expired",
+            "message": "The status list verifiable credential has expired."
+      }  
+```
+
+```
+  "error": {
+            "name": "status_list_signature_error",
+            "message": "The signature on the status list is invalid."
+      } 
+      ```
+
+``` 
+  "error": {
+            "name": "status_list_type_error",
+            "message": "Status list credential type must include \"BitstringStatusListCredential\"."
+      }  
+```
+
+```
+  "error": {
+            "name": "status_list_not_yet_valid",
+            "message": "The validFrom date on the status list credential is in the future."
+      }  
+```
+And a fallback for any unknown error:
+```
+       "error": {
+            "name": "status_list_error",
+            "message": "The status list couldn't be verified."
+      }  
 ```
 
 3. <b>fatal error</b>
