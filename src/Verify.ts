@@ -28,6 +28,7 @@ import { EXPIRED_ERROR, ISSUER_DID_RESOLVES, NOT_FOUND_ERROR, STATUS_NOT_YET_VAL
 import { Credential } from './types/credential.js';
 import { VerificationResponse, VerificationStep, PresentationVerificationResponse, PresentationSignatureResult } from './types/result.js';
 import { VerifiablePresentation } from './types/presentation.js';
+import { GENERAL_STATUS_LIST_ERROR_MSG, STATUS_LIST_EXPIRED_MSG, STATUS_LIST_NOT_YET_VALID_MSG, STATUS_LIST_SIGNATURE_ERROR_MSG, STATUS_LIST_TYPE_ERROR_MSG } from './constants/messages.js';
 
 const { purposes } = pkg;
 const presentationPurpose = new purposes.AssertionProofPurpose();
@@ -98,7 +99,7 @@ export async function verifyCredential({ credential, knownDIDRegistries }: { cre
       checkStatus: statusChecker,
       verifyMatchingIssuers: false
     });
-    // console.log(JSON.stringify(verificationResponse,null,2))
+
     const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries)
     return adjustedResponse;
   } catch (error) {
@@ -190,27 +191,27 @@ function handleAnyStatusError({ verificationResponse }: { verificationResponse: 
     } else if (statusResult?.error?.cause?.message?.includes(EXPIRED_ERROR)) {
       error = {
         name: STATUS_LIST_EXPIRED,
-        message: "The status list verifiable credential has expired."
+        message: STATUS_LIST_EXPIRED_MSG
       }
     } else if (statusResult?.error?.cause?.message?.startsWith(STATUS_SIGNATURE_ERROR)) {
       error = {
         name: STATUS_LIST_SIGNATURE_ERROR,
-        message: "The signature on the status list is invalid."
+        message: STATUS_LIST_SIGNATURE_ERROR_MSG
       }
     } else if (statusResult?.error?.message?.startsWith(STATUS_TYPE_ERROR)) {
       error = {
         name: STATUS_LIST_TYPE_ERROR,
-        message: 'Status list credential type must include "BitstringStatusListCredential".'
+        message: STATUS_LIST_TYPE_ERROR_MSG
       }
     } else if (statusResult?.error?.cause?.message?.includes(STATUS_NOT_YET_VALID_ERROR)) {
       error = {
         name: STATUS_LIST_NOT_YET_VALID_ERROR,
-        message: 'The validFrom date on the status list credential is in the future.'
+        message: STATUS_LIST_NOT_YET_VALID_MSG
       }
     } else {
       error = {
         name: UNKNOWN_STATUS_LIST_ERROR,
-        message: statusResult.error.cause?.message ?? "The status list couldn't be verified."
+        message: statusResult.error.cause?.message ?? GENERAL_STATUS_LIST_ERROR_MSG
       }
     }
     const statusStep = {

@@ -3,20 +3,18 @@ import deepEqualInAnyOrder from 'deep-equal-in-any-order'
 import { verifyCredential } from '../src/Verify.js'
 import { Credential } from '../src/types/credential.js';
 import { knownDIDRegistries } from '../src/test-fixtures/knownDidRegistries.js';
-import { SCHEMA_ENTRY_ID } from '../src/constants/verificationSteps.js';
 
-import { EXPIRATION_STEP_ID, REVOCATION_STATUS_STEP_ID } from '../src/constants/verificationSteps.js';
-import { DID_WEB_UNRESOLVED, INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, STATUS_LIST_NOT_FOUND, STATUS_LIST_EXPIRED, STATUS_LIST_SIGNATURE_ERROR, STATUS_LIST_TYPE_ERROR, STATUS_LIST_NOT_YET_VALID_ERROR } from '../src/constants/errors.js';
+import { REVOCATION_STATUS_STEP_ID } from '../src/constants/verificationSteps.js';
+import { STATUS_LIST_NOT_FOUND, STATUS_LIST_EXPIRED, STATUS_LIST_SIGNATURE_ERROR, STATUS_LIST_TYPE_ERROR, STATUS_LIST_NOT_YET_VALID_ERROR } from '../src/constants/errors.js';
 import { getVCv2DoubleSigWithBadStatusUrl } from '../src/test-fixtures/vc.js';
 import { getExpectedVerifiedResult } from '../src/test-fixtures/expectedResults.js';
+import { STATUS_LIST_EXPIRED_MSG, STATUS_LIST_NOT_YET_VALID_MSG, STATUS_LIST_SIGNATURE_ERROR_MSG, STATUS_LIST_TYPE_ERROR_MSG } from '../src/constants/messages.js';
 
 chai.use(deepEqualInAnyOrder);
 const { expect } = chai;
 
 /* 
-
-Tests credential status validation.
-
+Tests credential status list validation.
 */
 
 describe('status checks', () => {
@@ -47,7 +45,7 @@ describe('status checks', () => {
                 "id": REVOCATION_STATUS_STEP_ID,
                 "error": {
                   "name": STATUS_LIST_EXPIRED,
-                  "message": "The status list verifiable credential has expired."
+                  "message": STATUS_LIST_EXPIRED_MSG
                 }
               })
             const result = await verifyCredential({ credential, knownDIDRegistries })
@@ -63,7 +61,7 @@ describe('status checks', () => {
                 "id": REVOCATION_STATUS_STEP_ID,
                 "error": {
                   "name": STATUS_LIST_SIGNATURE_ERROR,
-                  "message": "The signature on the status list is invalid."
+                  "message": STATUS_LIST_SIGNATURE_ERROR_MSG
                 }
               })
             const result = await verifyCredential({ credential, knownDIDRegistries })
@@ -79,7 +77,7 @@ describe('status checks', () => {
                 "id": REVOCATION_STATUS_STEP_ID,
                 "error": {
                   "name": STATUS_LIST_TYPE_ERROR,
-                  "message": 'Status list credential type must include "BitstringStatusListCredential".'
+                  "message": STATUS_LIST_TYPE_ERROR_MSG
                 }
               })
             const result = await verifyCredential({ credential, knownDIDRegistries })
@@ -95,7 +93,7 @@ describe('status checks', () => {
                 "id": REVOCATION_STATUS_STEP_ID,
                 "error": {
                   "name": STATUS_LIST_NOT_YET_VALID_ERROR,
-                  "message": 'The validFrom date on the status list credential is in the future.'
+                  "message": STATUS_LIST_NOT_YET_VALID_MSG
                 }
               })
             const result = await verifyCredential({ credential, knownDIDRegistries })
