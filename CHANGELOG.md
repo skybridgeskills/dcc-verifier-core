@@ -1,5 +1,11 @@
 # @digitalcredentials/verifier-core CHANGELOG
 
+## 1.0.0-beta.11 - December 15 2025
+
+### Added
+
+- Returns staus list errors that had been incorrectly swallowed. See the README for new errors that are returned.
+
 ## 1.0.0-beta.10 - October 24 2025
 
 ### Added
