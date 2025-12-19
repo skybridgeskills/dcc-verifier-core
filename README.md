@@ -401,7 +401,7 @@ The status list errors that we return include:
             "name": "status_list_signature_error",
             "message": "The signature on the status list is invalid."
       } 
-      ```
+```
 
 ``` 
   "error": {
