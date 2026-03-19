@@ -31,7 +31,6 @@ import { VerifiablePresentation } from './types/presentation.js';
 import { GENERAL_STATUS_LIST_ERROR_MSG, STATUS_LIST_EXPIRED_MSG, STATUS_LIST_NOT_YET_VALID_MSG, STATUS_LIST_SIGNATURE_ERROR_MSG, STATUS_LIST_TYPE_ERROR_MSG } from './constants/messages.js';
 
 const { purposes } = pkg;
-const presentationPurpose = new purposes.AssertionProofPurpose();
 
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 
@@ -51,10 +50,20 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
     reloadIssuerRegistry?: boolean
   }
 ): Promise<PresentationVerificationResponse> {
+  const assertedPurpose = presentation?.proof?.proofPurpose;
+
+  // TODO: AuthenticationProofPurpose({challenge}) ('authentication') is used by LCW and is correct, 
+  // but the package currently seems to expect and verify presentations from systems that use
+  // assertionMethod.
+  const useAuthenticationPurpose = assertedPurpose === 'authenticationMethod' || assertedPurpose === 'authentication';
+  const presentationPurpose = useAuthenticationPurpose
+    ? new purposes.AuthenticationProofPurpose({ challenge: challenge ?? undefined })
+    : new purposes.AssertionProofPurpose();
+
   try {
     const credential = extractCredentialsFrom(presentation)?.find(
       vc => vc.credentialStatus);
-    const checkStatus = credential ? getCredentialStatusChecker(credential) : undefined;
+    const checkStatus = (credential ? getCredentialStatusChecker(credential) : undefined) ?? undefined;
     const result = await vc.verify({
       presentation,
       presentationPurpose,
@@ -62,7 +71,7 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
       documentLoader,
       unsignedPresentation,
       checkStatus,
-      challenge,
+      challenge: challenge ?? undefined,
       verifyMatchingIssuers: false
     });
 
@@ -96,7 +105,7 @@ export async function verifyCredential({ credential, knownDIDRegistries }: { cre
       credential,
       suite,
       documentLoader,
-      checkStatus: statusChecker,
+      checkStatus: statusChecker ?? undefined,
       verifyMatchingIssuers: false
     });
 
