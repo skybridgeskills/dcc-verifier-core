@@ -2,9 +2,9 @@
 import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';
 import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
-import { verifyPresentation as vcVerifyPresentation, verifyCredential as vcVerifyCredential } from '@digitalcredentials/vc';
+import { verify as vcVerifyPresentation, verifyCredential as vcVerifyCredential } from '@digitalcredentials/vc';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
-import pkg from '@digitalcredentials/jsonld-signatures';
+import jsonLdSignatures from '@digitalcredentials/jsonld-signatures';
 
 import { getCredentialStatusChecker } from './credentialStatus.js';
 import { addTrustedIssuersToVerificationResponse } from './issuerRegistries.js';
@@ -30,7 +30,7 @@ import { VerificationResponse, VerificationStep, PresentationVerificationRespons
 import { VerifiablePresentation } from './types/presentation.js';
 import { GENERAL_STATUS_LIST_ERROR_MSG, STATUS_LIST_EXPIRED_MSG, STATUS_LIST_NOT_YET_VALID_MSG, STATUS_LIST_SIGNATURE_ERROR_MSG, STATUS_LIST_TYPE_ERROR_MSG } from './constants/messages.js';
 
-const { purposes } = pkg;
+const { purposes } = jsonLdSignatures;
 
 const documentLoader = securityLoader({ fetchRemoteContexts: true }).build();
 
@@ -71,7 +71,7 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
       documentLoader,
       unsignedPresentation,
       checkStatus,
-      challenge: challenge,
+      challenge,
       verifyMatchingIssuers: false
     });
 

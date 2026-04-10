@@ -41,13 +41,13 @@ import {
   getVCv1ExpiredWithValidStatus
 } from '../src/test-fixtures/vc.js'
 
-import { purposes } from '@digitalcredentials/jsonld-signatures';
+import jsonLdSignatures from '@digitalcredentials/jsonld-signatures';
+const { AuthenticationProofPurpose } = jsonLdSignatures.purposes;
 import { getSignedVP, getUnSignedVP } from './vpUtils.js';
 import { VerifiablePresentation } from '../src/types/presentation.js';
 
 import { INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, PRESENTATION_ERROR } from '../src/constants/errors.js';
 import { SIGNATURE_INVALID, SIGNATURE_UNSIGNED } from '../src/constants/verificationSteps.js';
-
 
 const noProofVC: any = getVCv1NoProof()
 const expectedNoProofResult = getExpectedFatalResult({
@@ -174,7 +174,7 @@ describe('Verify.verifyPresentation', () => {
       const presentation = await getSignedVP({
         holder,
         verifiableCredential,
-        presentationPurpose: new purposes.AuthenticationProofPurpose({ challenge }),
+        presentationPurpose: new AuthenticationProofPurpose({ challenge }),
         challenge
       }) as VerifiablePresentation
       const credentialResults = [expectedV2WithStatusResult]
@@ -190,7 +190,7 @@ describe('Verify.verifyPresentation', () => {
       const presentation = await getSignedVP({
         holder,
         verifiableCredential,
-        presentationPurpose: new purposes.AuthenticationProofPurpose({ challenge }),
+        presentationPurpose: new AuthenticationProofPurpose({ challenge }),
         challenge
       }) as VerifiablePresentation
       const result = await verifyPresentation({ presentation, knownDIDRegistries, challenge: 'wrong-challenge' })
