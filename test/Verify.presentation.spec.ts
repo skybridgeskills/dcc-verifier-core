@@ -41,11 +41,10 @@ import {
   getVCv1ExpiredWithValidStatus
 } from '../src/test-fixtures/vc.js'
 
-import pkg from '@digitalcredentials/jsonld-signatures';
+import { purposes } from '@digitalcredentials/jsonld-signatures';
 import { getSignedVP, getUnSignedVP } from './vpUtils.js';
 import { VerifiablePresentation } from '../src/types/presentation.js';
 
-const { purposes } = pkg;
 import { INVALID_CREDENTIAL_ID, INVALID_SIGNATURE, NO_PROOF, PRESENTATION_ERROR } from '../src/constants/errors.js';
 import { SIGNATURE_INVALID, SIGNATURE_UNSIGNED } from '../src/constants/verificationSteps.js';
 

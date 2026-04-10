@@ -2,7 +2,7 @@
 import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';
 import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
-import * as vc from '@digitalcredentials/vc';
+import { verifyPresentation as vcVerifyPresentation, verifyCredential as vcVerifyCredential } from '@digitalcredentials/vc';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
 import pkg from '@digitalcredentials/jsonld-signatures';
 
@@ -57,27 +57,27 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
   // assertionMethod.
   const useAuthenticationPurpose = assertedPurpose === 'authenticationMethod' || assertedPurpose === 'authentication';
   const presentationPurpose = useAuthenticationPurpose
-    ? new purposes.AuthenticationProofPurpose({ challenge: challenge ?? undefined })
+    ? new purposes.AuthenticationProofPurpose({ challenge })
     : new purposes.AssertionProofPurpose();
 
   try {
     const credential = extractCredentialsFrom(presentation)?.find(
       vc => vc.credentialStatus);
-    const checkStatus = (credential ? getCredentialStatusChecker(credential) : undefined) ?? undefined;
-    const result = await vc.verify({
+      const checkStatus = credential ? getCredentialStatusChecker(credential) : undefined;
+    const result = await vcVerifyPresentation({
       presentation,
       presentationPurpose,
       suite,
       documentLoader,
       unsignedPresentation,
       checkStatus,
-      challenge: challenge ?? undefined,
+      challenge: challenge,
       verifyMatchingIssuers: false
     });
 
-    const transformedCredentialResults = await Promise.all(result.credentialResults.map(async (credentialResult: any) => {
+    const transformedCredentialResults = await Promise.all(result.credentialResults?.map(async (credentialResult: any) => {
       return transformResponse(credentialResult, credentialResult.credential, knownDIDRegistries)
-    }));
+    }) ?? []);
 
     // take what we need from the presentation part of the result
     let signature: PresentationSignatureResult;
@@ -101,15 +101,15 @@ export async function verifyCredential({ credential, knownDIDRegistries }: { cre
     // null unless credential has a status
     const statusChecker = getCredentialStatusChecker(credential)
 
-    const verificationResponse = await vc.verifyCredential({
+    const verificationResponse = await vcVerifyCredential({
       credential,
       suite,
       documentLoader,
-      checkStatus: statusChecker ?? undefined,
+      checkStatus: statusChecker,
       verifyMatchingIssuers: false
     });
 
-    const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries)
+    const adjustedResponse = await transformResponse(verificationResponse, credential, knownDIDRegistries);
     return adjustedResponse;
   } catch (error) {
     return { errors: [{ message: 'Could not verify credential.', name: UNKNOWN_ERROR, stackTrace: error }] }
