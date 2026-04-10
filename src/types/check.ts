@@ -14,14 +14,19 @@ export interface CheckResult {
   /** Suite id, e.g. "core" */
   suite: string;
   outcome: CheckOutcome;
+  /** ISO timestamp when the check was executed */
+  timestamp: string;
 }
+
+/** Subject types that checks can apply to. */
+export type VerificationSubjectType = 'verifiableCredential' | 'verifiablePresentation';
 
 /** A single verification check with metadata. */
 export interface VerificationCheck {
   id: string;
   name: string;
   description?: string;
-  appliesTo?: Array<'verifiableCredential' | 'verifiablePresentation'>;
+  appliesTo?: readonly VerificationSubjectType[];
   /** If true, a failure stops remaining checks in this suite. */
   fatal?: boolean;
   execute: (

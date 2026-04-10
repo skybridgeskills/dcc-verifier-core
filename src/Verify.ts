@@ -61,9 +61,10 @@ export async function verifyPresentation({ presentation, challenge = 'meaningles
     : new purposes.AssertionProofPurpose();
 
   try {
-    const credential = extractCredentialsFrom(presentation)?.find(
-      vc => vc.credentialStatus);
-      const checkStatus = credential ? getCredentialStatusChecker(credential) : undefined;
+    const credentials = extractCredentialsFrom(presentation);
+    const credential = credentials?.find(
+      vc => (vc as { credentialStatus?: unknown }).credentialStatus);
+    const checkStatus = credential ? getCredentialStatusChecker(credential as Credential) : undefined;
     const result = await vcVerifyPresentation({
       presentation,
       presentationPurpose,

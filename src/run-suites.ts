@@ -46,7 +46,12 @@ export async function runSuites(
       }
 
       const outcome: CheckOutcome = await check.execute(subject, context);
-      results.push({ check: check.id, suite: suite.id, outcome });
+      results.push({
+        check: check.id,
+        suite: suite.id,
+        outcome,
+        timestamp: new Date().toISOString(),
+      });
 
       // Fatal failure stops remaining checks in this suite only
       if (check.fatal && outcome.status === 'failure') {
