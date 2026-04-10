@@ -22,7 +22,7 @@ export const contextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:invalid-jsonld',
+          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
           title: 'Invalid JSON-LD',
           detail: 'No verifiable credential found in subject.',
         }],
@@ -35,7 +35,7 @@ export const contextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:invalid-jsonld',
+          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
           title: 'Invalid JSON-LD',
           detail: 'Credential is missing required @context property.',
         }],
@@ -50,7 +50,7 @@ export const contextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:invalid-jsonld',
+          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
           title: 'Invalid JSON-LD',
           detail: 'Credential @context property is empty.',
         }],

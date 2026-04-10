@@ -64,7 +64,7 @@ describe('Core Structure Suite', () => {
       expect(results[0].check).to.equal('core.context-exists');
       expect(results[0].outcome.status).to.equal('failure');
       if (results[0].outcome.status === 'failure') {
-        expect(results[0].outcome.problems[0].type).to.equal('urn:vc-verify:invalid-jsonld');
+        expect(results[0].outcome.problems[0].type).to.equal('https://www.w3.org/TR/vc-data-model#PARSING_ERROR');
       }
     });
   });
@@ -106,7 +106,7 @@ describe('Core Structure Suite', () => {
       expect(results[1].check).to.equal('core.vc-context');
       expect(results[1].outcome.status).to.equal('failure');
       if (results[1].outcome.status === 'failure') {
-        expect(results[1].outcome.problems[0].type).to.equal('urn:vc-verify:no-vc-context');
+        expect(results[1].outcome.problems[0].type).to.equal('https://www.w3.org/TR/vc-data-model#PARSING_ERROR');
       }
     });
   });
@@ -125,7 +125,7 @@ describe('Core Structure Suite', () => {
       expect(results[2].check).to.equal('core.credential-id');
       expect(results[2].outcome.status).to.equal('failure');
       if (results[2].outcome.status === 'failure') {
-        expect(results[2].outcome.problems[0].type).to.equal('urn:vc-verify:invalid-credential-id');
+        expect(results[2].outcome.problems[0].type).to.equal('https://www.w3.org/TR/vc-data-model#INVALID_CREDENTIAL_ID');
       }
     });
 
@@ -156,7 +156,7 @@ describe('Core Structure Suite', () => {
       expect(results[3].check).to.equal('core.proof-exists');
       expect(results[3].outcome.status).to.equal('failure');
       if (results[3].outcome.status === 'failure') {
-        expect(results[3].outcome.problems[0].type).to.equal('urn:vc-verify:no-proof');
+        expect(results[3].outcome.problems[0].type).to.equal('https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR');
       }
     });
 

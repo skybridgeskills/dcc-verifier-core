@@ -25,7 +25,7 @@ export const vcContextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:no-vc-context',
+          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
           title: 'No VC Context',
           detail: 'No verifiable credential found in subject.',
         }],
@@ -55,7 +55,7 @@ export const vcContextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:no-vc-context',
+          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
           title: 'No VC Context',
           detail: `Credential @context does not include required VC context URI (${VC_CONTEXT_V1} or ${VC_CONTEXT_V2}).`,
         }],

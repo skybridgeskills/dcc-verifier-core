@@ -22,7 +22,7 @@ export const proofExistsCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:no-proof',
+          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
           title: 'No Proof',
           detail: 'No verifiable credential found in subject.',
         }],
@@ -35,7 +35,7 @@ export const proofExistsCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:no-proof',
+          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
           title: 'No Proof',
           detail: 'Credential is missing required proof property.',
         }],
@@ -52,7 +52,7 @@ export const proofExistsCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'urn:vc-verify:no-proof',
+          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
           title: 'No Proof',
           detail: 'Credential proof property is invalid.',
         }],
