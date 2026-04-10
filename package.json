@@ -44,7 +44,8 @@
     "@digitalcredentials/vc": "^10.0.0",
     "@digitalcredentials/vc-bitstring-status-list": "^1.0.0",
     "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "zod": "^3.24.4"
   },
   "devDependencies": {
     "@digitalcredentials/ed25519-verification-key-2020": "^4.0.0",
