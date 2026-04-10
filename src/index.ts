@@ -2,17 +2,9 @@
  * Copyright (c) 2022 Digital Credentials Consortium. All rights reserved.
  */
 
-// ==================== Main Public API (Legacy - for backward compatibility) ====================
-// These exports maintain backward compatibility with existing code
+// ==================== Main Public API ====================
 
-export { verifyCredential, verifyPresentation } from './Verify.js';
-export type { VerificationResponse, PresentationVerificationResponse, VerificationError, VerificationStep } from './types/result.js';
-
-// ==================== New Suite-Based Architecture (Experimental) ====================
-// These exports are for the new suite-based verification architecture
-// They are prefixed with 'suite' to avoid naming conflicts during transition
-
-export { verifyCredential as suiteVerifyCredential, verifyPresentation as suiteVerifyPresentation } from './verify-suite.js';
+export { verifyCredential, verifyPresentation } from './verify-suite.js';
 export type { CredentialVerificationResult, PresentationVerificationResult } from './types/result.js';
 export type { VerifyCredentialOptions, VerifyPresentationOptions } from './types/options.js';
 

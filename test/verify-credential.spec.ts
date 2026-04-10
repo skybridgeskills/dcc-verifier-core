@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { suiteVerifyCredential as verifyCredential } from '../src/index.js';
+import { verifyCredential } from '../src/index.js';
 import { coreSuite } from '../src/suites/core/index.js';
 import { VerificationCheck, CheckOutcome } from '../src/types/check.js';
 

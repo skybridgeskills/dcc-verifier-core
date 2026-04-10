@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { suiteVerifyPresentation as verifyPresentation, suiteVerifyCredential as verifyCredential } from '../src/index.js';
+import { verifyPresentation, verifyCredential } from '../src/index.js';
 
 // Import test fixtures
 import { v1NoStatus } from '../src/test-fixtures/verifiableCredentials/v1/v1NoStatus.js';
