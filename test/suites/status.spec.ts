@@ -3,23 +3,23 @@ import { runSuites } from '../../src/run-suites.js';
 import { statusSuite } from '../../src/suites/status/index.js';
 import { buildContext } from '../../src/defaults.js';
 import { VerificationSubject } from '../../src/types/subject.js';
-import { VerificationContext } from '../../src/types/context.js';
-
-// Import test fixtures
-import { v2NoStatus } from '../../src/test-fixtures/verifiableCredentials/v2/v2NoStatus.js';
-import { v2WithValidStatus } from '../../src/test-fixtures/verifiableCredentials/v2/v2WithValidStatus.js';
+import {
+  BitstringStatusEntry,
+  CredentialFactory,
+  DEFAULT_TEST_ISSUER_DID,
+  StatusListCredentialFactory,
+} from '../factories/data/index.js';
+import { FakeDocumentLoader } from '../factories/services/fake-document-loader.js';
 
 describe('Status Suite', () => {
-  const context = buildContext();
-
-  // Helper to create subject from credential
   const createSubject = (credential: unknown): VerificationSubject => ({
     verifiableCredential: credential,
   });
 
   describe('credential with no credentialStatus', () => {
     it('skips check when credential has no status', async () => {
-      const subject = createSubject(v2NoStatus);
+      const context = buildContext();
+      const subject = createSubject(CredentialFactory({ version: 'v2', credential: {} }));
       const results = await runSuites([statusSuite], subject, context);
 
       expect(results).to.have.lengthOf(1);
@@ -33,16 +33,20 @@ describe('Status Suite', () => {
 
   describe('credential with legacy status types', () => {
     it('skips check for StatusList2021Entry status type', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialStatus = {
-        id: 'https://example.com/status#1',
-        type: 'StatusList2021Entry',
-        statusPurpose: 'revocation',
-        statusListIndex: '1',
-        statusListCredential: 'https://example.com/status',
-      };
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: {
+            id: 'https://example.com/status#1',
+            type: 'StatusList2021Entry',
+            statusPurpose: 'revocation',
+            statusListIndex: '1',
+            statusListCredential: 'https://example.com/status',
+          },
+        },
+      });
       const subject = createSubject(cred);
-      const results = await runSuites([statusSuite], subject, context);
+      const results = await runSuites([statusSuite], subject, buildContext());
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('skipped');
@@ -52,16 +56,20 @@ describe('Status Suite', () => {
     });
 
     it('skips check for 1EdTechRevocationList status type', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialStatus = {
-        id: 'https://example.com/status#1',
-        type: '1EdTechRevocationList',
-        statusPurpose: 'revocation',
-        statusListIndex: '1',
-        statusListCredential: 'https://example.com/status',
-      };
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: {
+            id: 'https://example.com/status#1',
+            type: '1EdTechRevocationList',
+            statusPurpose: 'revocation',
+            statusListIndex: '1',
+            statusListCredential: 'https://example.com/status',
+          },
+        },
+      });
       const subject = createSubject(cred);
-      const results = await runSuites([statusSuite], subject, context);
+      const results = await runSuites([statusSuite], subject, buildContext());
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('skipped');
@@ -69,43 +77,116 @@ describe('Status Suite', () => {
   });
 
   describe('credential with BitstringStatusListEntry', () => {
-    it.skip('checks valid status list entry (requires network)', async function() {
-      this.timeout(60000);
-      // Skip in sandbox - requires network for status list fetch
-      const subject = createSubject(v2WithValidStatus);
-      const results = await runSuites([statusSuite], subject, context);
+    it('succeeds when index is not revoked (unsigned list credential)', async () => {
+      const listUrl = 'https://factory.test/status/list-ok';
+      const slCred = await StatusListCredentialFactory({
+        id: listUrl,
+        issuer: DEFAULT_TEST_ISSUER_DID,
+        revokedIndexes: [],
+        listLength: 32,
+      });
+      const documentLoader = FakeDocumentLoader({ [listUrl]: slCred });
+      const context = buildContext({
+        documentLoader,
+        verifyBitstringStatusListCredential: false,
+      });
+
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl,
+            statusListIndex: '0',
+          }),
+        },
+      });
+      const results = await runSuites([statusSuite], createSubject(cred), context);
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('success');
+      if (results[0].outcome.status === 'success') {
+        expect(results[0].outcome.message).to.include('not revoked');
+      }
+    });
+
+    it('fails when index is revoked', async () => {
+      const listUrl = 'https://factory.test/status/list-revoked';
+      const slCred = await StatusListCredentialFactory({
+        id: listUrl,
+        issuer: DEFAULT_TEST_ISSUER_DID,
+        revokedIndexes: [2],
+        listLength: 32,
+      });
+      const documentLoader = FakeDocumentLoader({ [listUrl]: slCred });
+      const context = buildContext({
+        documentLoader,
+        verifyBitstringStatusListCredential: false,
+      });
+
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl,
+            statusListIndex: '2',
+          }),
+        },
+      });
+      const results = await runSuites([statusSuite], createSubject(cred), context);
+
+      expect(results[0].outcome.status).to.equal('failure');
+      if (results[0].outcome.status === 'failure') {
+        expect(results[0].outcome.problems[0].type).to.equal(
+          'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED',
+        );
+      }
     });
   });
 
-  describe('non-fatal behavior', () => {
-    it('is non-fatal even when status check fails', async function() {
-      this.timeout(30000);
-      const cred = JSON.parse(JSON.stringify(v2WithValidStatus));
-      // Modify to cause a status check error
-      cred.credentialStatus.statusListCredential = 'https://invalid-url-that-wont-resolve.example.com/status';
+  describe('status list load failures', () => {
+    it('fails when status list credential URL cannot be loaded', async function () {
+      this.timeout(15000);
+      const listUrl = 'https://factory.test/status/missing';
+      const documentLoader = FakeDocumentLoader({});
+      const context = buildContext({
+        documentLoader,
+        verifyBitstringStatusListCredential: false,
+      });
 
-      const subject = createSubject(cred);
-      const results = await runSuites([statusSuite], subject, context);
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl,
+            statusListIndex: '0',
+          }),
+        },
+      });
+      const results = await runSuites([statusSuite], createSubject(cred), context);
 
-      expect(results).to.have.lengthOf(1);
-      // Should fail but check is non-fatal
-      expect(results[0].outcome.status).to.be.oneOf(['success', 'failure', 'skipped']);
+      expect(results[0].outcome.status).to.equal('failure');
+      if (results[0].outcome.status === 'failure') {
+        expect(results[0].outcome.problems[0].detail).to.match(
+          /Could not load|Document not found|NotFoundError/i,
+        );
+      }
     });
   });
 
   describe('unknown status types', () => {
     it('skips check for unknown status type', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialStatus = {
-        id: 'https://example.com/status#1',
-        type: 'UnknownStatusType',
-        statusPurpose: 'revocation',
-      };
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: {
+            id: 'https://example.com/status#1',
+            type: 'UnknownStatusType',
+            statusPurpose: 'revocation',
+          },
+        },
+      });
       const subject = createSubject(cred);
-      const results = await runSuites([statusSuite], subject, context);
+      const results = await runSuites([statusSuite], subject, buildContext());
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('skipped');

@@ -42,6 +42,8 @@ export type FakeCryptoServiceOptions = {
   verified?: boolean;
   message?: string;
   problems?: ProblemDetail[];
+  /** When set, verifyCredential / verifyPresentation reject with this error. */
+  throwInVerify?: Error;
 };
 
 /**
@@ -53,9 +55,13 @@ export function FakeCryptoService(options: FakeCryptoServiceOptions = {}): Crypt
     verified = true,
     message = 'Fake verification passed.',
     problems = DEFAULT_FAIL_PROBLEMS,
+    throwInVerify,
   } = options;
 
   const resolve = async (): Promise<CryptoResult> => {
+    if (throwInVerify !== undefined) {
+      throw throwInVerify;
+    }
     if (verified) {
       return { verified: true, message };
     }

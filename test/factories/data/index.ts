@@ -5,7 +5,7 @@ export {
   PlaceholderProof,
 } from './credential-factory.js';
 export type {
-  CredentialFactoryInput,
+  CredentialFactoryOptions,
   CredentialVersion,
 } from './credential-factory.js';
 export { PresentationFactory } from './presentation-factory.js';

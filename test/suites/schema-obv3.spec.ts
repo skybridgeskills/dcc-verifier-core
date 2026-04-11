@@ -3,123 +3,203 @@ import { runSuites } from '../../src/run-suites.js';
 import { obv3SchemaSuite } from '../../src/suites/schema/obv3/index.js';
 import { buildContext } from '../../src/defaults.js';
 import { VerificationSubject } from '../../src/types/subject.js';
+import { CredentialFactory } from '../factories/data/credential-factory.js';
+import { compose } from '../factories/data/compose.js';
+import { addResults } from '../factories/data/transforms.js';
+import { FakeFetchJson } from '../factories/services/fake-fetch-json.js';
 
-// Import test fixtures
-import { v2NoStatus } from '../../src/test-fixtures/verifiableCredentials/v2/v2NoStatus.js';
-import { v1NoStatus } from '../../src/test-fixtures/verifiableCredentials/v1/v1NoStatus.js';
+const OBV3_V2_ACHIEVEMENT_SCHEMA_URL =
+  'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json';
+
+const OBV3_V2_ENDORSEMENT_SCHEMA_URL =
+  'https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_endorsementcredential_schema.json';
+
+function minimalSchema($id: string): Record<string, unknown> {
+  return {
+    $id,
+    $schema: 'https://json-schema.org/draft/2019-09/schema',
+    type: 'object',
+    required: ['@context', 'type', 'issuer', 'credentialSubject'],
+    additionalProperties: true,
+    properties: {
+      '@context': {},
+      type: {},
+      issuer: {},
+      credentialSubject: {},
+    },
+  };
+}
 
 describe('OBv3 Schema Suite', () => {
-  const context = buildContext();
-
-  // Helper to create subject from credential
   const createSubject = (credential: unknown): VerificationSubject => ({
     verifiableCredential: credential,
   });
 
   describe('OBv3 schema check', () => {
-    it('skips or fails check for non-OBv3 credentials', async () => {
-      const cred = JSON.parse(JSON.stringify(v1NoStatus));
-      // v1NoStatus doesn't have OBv3 context
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+    it('skips when credential is not OBv3-shaped', async () => {
+      const cred = CredentialFactory({
+        version: 'v1',
+        credential: {
+          type: ['VerifiableCredential'],
+          '@context': [
+            'https://www.w3.org/2018/credentials/v1',
+            'https://w3id.org/security/suites/ed25519-2020/v1',
+          ],
+        },
+      });
+      const context = buildContext({
+        fetchJson: FakeFetchJson({}),
+      });
+      const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
-      // Should skip because no OBv3 context found
-      expect(['skipped', 'failure']).to.include(schemaCheck?.outcome.status);
+      expect(schemaCheck?.outcome.status).to.equal('skipped');
     });
 
-    it('processes OpenBadgeCredential with OBv3 context', async () => {
-      const subject = createSubject(v2NoStatus);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
-
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
-      expect(schemaCheck).to.exist;
-      // Should attempt validation (may fail due to network/schema issues in sandbox)
-      expect(['success', 'failure', 'skipped']).to.include(schemaCheck?.outcome.status);
-    });
-
-    it('skips check for EndorsementCredential without OBv3 context', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.type = ['VerifiableCredential', 'EndorsementCredential'];
-      // Still has OBv3 context, so this should actually try to validate
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
-
-      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
-      expect(schemaCheck).to.exist;
-      // Since it has OBv3 context and EndorsementCredential type, it should attempt validation
-      expect(['success', 'failure', 'skipped']).to.include(schemaCheck?.outcome.status);
-    });
-
-    it.skip('validates valid OBv3 credential (requires network)', async function() {
-      this.timeout(60000);
-      const subject = createSubject(v2NoStatus);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+    it('validates OpenBadgeCredential when schema is served locally', async () => {
+      const cred = CredentialFactory({ version: 'v2', credential: {} });
+      const fetchJson = FakeFetchJson({
+        [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: minimalSchema(OBV3_V2_ACHIEVEMENT_SCHEMA_URL),
+      });
+      const context = buildContext({ fetchJson });
+      const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
       expect(schemaCheck?.outcome.status).to.equal('success');
     });
 
-    it('handles invalid OBv3 credential', async function() {
-      this.timeout(30000);
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      // Remove required fields to make it invalid
-      delete cred.credentialSubject;
-
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+    it('validates EndorsementCredential when schema is served locally', async () => {
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: { type: ['VerifiableCredential', 'EndorsementCredential'] },
+      });
+      const fetchJson = FakeFetchJson({
+        [OBV3_V2_ENDORSEMENT_SCHEMA_URL]: minimalSchema(OBV3_V2_ENDORSEMENT_SCHEMA_URL),
+      });
+      const context = buildContext({ fetchJson });
+      const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
-      expect(schemaCheck).to.exist;
-      // Should either fail validation or error during validation
-      expect(['failure', 'skipped']).to.include(schemaCheck?.outcome.status);
+      expect(schemaCheck?.outcome.status).to.equal('success');
     });
 
-    it('uses credentialSchema when specified', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialSchema = {
-        id: 'https://example.com/custom-schema.json',
-        type: 'JsonSchemaValidator2018',
-      };
+    it('fails AJV validation when credential is missing required fields', async () => {
+      const cred = CredentialFactory({ version: 'v2', credential: {} });
+      delete (cred as { credentialSubject?: unknown }).credentialSubject;
 
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+      const fetchJson = FakeFetchJson({
+        [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: minimalSchema(OBV3_V2_ACHIEVEMENT_SCHEMA_URL),
+      });
+      const context = buildContext({ fetchJson });
+      const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
-      expect(schemaCheck).to.exist;
-      // Should attempt to use the custom schema
-      expect(['success', 'failure', 'skipped']).to.include(schemaCheck?.outcome.status);
+      expect(schemaCheck?.outcome.status).to.equal('failure');
+      if (schemaCheck?.outcome.status === 'failure') {
+        expect(schemaCheck.outcome.problems[0].type).to.equal(
+          'https://www.w3.org/TR/vc-data-model#SCHEMA_VALIDATION_FAILED',
+        );
+      }
+    });
+
+    it('uses credentialSchema id when specified', async () => {
+      const customUrl = 'https://factory.test/custom-credential-schema.json';
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialSchema: {
+            id: customUrl,
+            type: 'JsonSchemaValidator2018',
+          },
+        },
+      });
+      const fetchJson = FakeFetchJson({
+        [customUrl]: minimalSchema(customUrl),
+      });
+      const context = buildContext({ fetchJson });
+      const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
+
+      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      expect(schemaCheck?.outcome.status).to.equal('success');
+    });
+
+    it('uses first credentialSchema entry when property is an array', async () => {
+      const customUrl = 'https://factory.test/array-first-schema.json';
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialSchema: [
+            { id: customUrl, type: 'JsonSchemaValidator2018' },
+            { id: 'https://factory.test/ignored.json', type: 'JsonSchemaValidator2018' },
+          ],
+        },
+      });
+      const fetchJson = FakeFetchJson({
+        [customUrl]: minimalSchema(customUrl),
+      });
+      const context = buildContext({ fetchJson });
+      const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
+
+      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      expect(schemaCheck?.outcome.status).to.equal('success');
+    });
+
+    it('fails when schema URL cannot be fetched', async () => {
+      const cred = CredentialFactory({ version: 'v2', credential: {} });
+      const context = buildContext({
+        fetchJson: FakeFetchJson({}),
+      });
+      const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
+
+      const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
+      expect(schemaCheck?.outcome.status).to.equal('failure');
+      if (schemaCheck?.outcome.status === 'failure') {
+        expect(schemaCheck.outcome.problems[0].type).to.equal(
+          'https://www.w3.org/TR/vc-data-model#SCHEMA_VALIDATION_ERROR',
+        );
+        expect(schemaCheck.outcome.problems[0].detail).to.include('No fake response');
+      }
     });
   });
 
   describe('OBv3 result reference check', () => {
     it('skips check when credential has no results', async () => {
-      const subject = createSubject(v2NoStatus);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+      const cred = CredentialFactory({ version: 'v2', credential: {} });
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
       expect(refCheck?.outcome.status).to.equal('skipped');
     });
 
     it('validates correct result references', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialSubject.result = [
-        {
-          type: 'Result',
-          resultDescription: 'https://example.com/result-descriptions/1',
-          value: 'Pass',
-        },
-      ];
-      cred.credentialSubject.achievement.resultDescription = [
-        {
-          id: 'https://example.com/result-descriptions/1',
-          type: 'ResultDescription',
-          name: 'Test Score',
-        },
-      ];
-
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+      const cred = compose(
+        CredentialFactory({ version: 'v2', credential: {} }),
+        addResults({
+          results: [
+            {
+              type: 'Result',
+              resultDescription: 'https://example.test/result-descriptions/1',
+              value: 'Pass',
+            },
+          ],
+          resultDescriptions: [
+            {
+              id: 'https://example.test/result-descriptions/1',
+              type: 'ResultDescription',
+              name: 'Test Score',
+            },
+          ],
+        }),
+      );
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
       expect(refCheck?.outcome.status).to.equal('success');
@@ -128,58 +208,84 @@ describe('OBv3 Schema Suite', () => {
       }
     });
 
-    it('fails for invalid result references', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialSubject.result = [
-        {
-          type: 'Result',
-          resultDescription: 'https://example.com/result-descriptions/999', // Doesn't exist
-          value: 'Pass',
-        },
-      ];
-      cred.credentialSubject.achievement.resultDescription = [
-        {
-          id: 'https://example.com/result-descriptions/1',
-          type: 'ResultDescription',
-          name: 'Test Score',
-        },
-      ];
+    it('validates compose-generated cross references', async () => {
+      const cred = compose(CredentialFactory({ version: 'v2' }), addResults({ count: 3 }));
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+      const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+      expect(refCheck?.outcome.status).to.equal('success');
+    });
+
+    it('fails for invalid result references', async () => {
+      const cred = compose(
+        CredentialFactory({ version: 'v2', credential: {} }),
+        addResults({
+          results: [
+            {
+              type: 'Result',
+              resultDescription: 'https://example.test/result-descriptions/999',
+              value: 'Pass',
+            },
+          ],
+          resultDescriptions: [
+            {
+              id: 'https://example.test/result-descriptions/1',
+              type: 'ResultDescription',
+              name: 'Test Score',
+            },
+          ],
+        }),
+      );
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
       expect(refCheck?.outcome.status).to.equal('failure');
       if (refCheck?.outcome.status === 'failure') {
-        expect(refCheck.outcome.problems[0].type).to.equal('https://www.w3.org/TR/vc-data-model#OBV3_INVALID_RESULT_REFERENCE');
+        expect(refCheck.outcome.problems[0].type).to.equal(
+          'https://www.w3.org/TR/vc-data-model#OBV3_INVALID_RESULT_REFERENCE',
+        );
         expect(refCheck.outcome.problems[0].detail).to.include('does not exist');
       }
     });
 
     it('handles multiple result entries with mixed references', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialSubject.result = [
-        {
-          type: 'Result',
-          resultDescription: 'https://example.com/result-descriptions/1', // Valid
-          value: 'Pass',
-        },
-        {
-          type: 'Result',
-          resultDescription: 'https://example.com/result-descriptions/999', // Invalid
-          value: 'Fail',
-        },
-      ];
-      cred.credentialSubject.achievement.resultDescription = [
-        {
-          id: 'https://example.com/result-descriptions/1',
-          type: 'ResultDescription',
-          name: 'Test Score',
-        },
-      ];
-
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+      const cred = compose(
+        CredentialFactory({ version: 'v2', credential: {} }),
+        addResults({
+          results: [
+            {
+              type: 'Result',
+              resultDescription: 'https://example.test/result-descriptions/1',
+              value: 'Pass',
+            },
+            {
+              type: 'Result',
+              resultDescription: 'https://example.test/result-descriptions/999',
+              value: 'Fail',
+            },
+          ],
+          resultDescriptions: [
+            {
+              id: 'https://example.test/result-descriptions/1',
+              type: 'ResultDescription',
+              name: 'Test Score',
+            },
+          ],
+        }),
+      );
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
       expect(refCheck?.outcome.status).to.equal('failure');
@@ -190,92 +296,83 @@ describe('OBv3 Schema Suite', () => {
     });
 
     it('skips when result entry has no resultDescription', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialSubject.result = [
-        {
-          type: 'Result',
-          // No resultDescription field
-          value: 'Pass',
-        },
-      ];
-      cred.credentialSubject.achievement.resultDescription = [
-        {
-          id: 'https://example.com/result-descriptions/1',
-          type: 'ResultDescription',
-          name: 'Test Score',
-        },
-      ];
-
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+      const cred = compose(
+        CredentialFactory({ version: 'v2', credential: {} }),
+        addResults({
+          results: [{ type: 'Result', value: 'Pass' }],
+          resultDescriptions: [
+            {
+              id: 'https://example.test/result-descriptions/1',
+              type: 'ResultDescription',
+              name: 'Test Score',
+            },
+          ],
+        }),
+      );
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
-      // Should pass because the result entry without resultDescription is not checked
       expect(refCheck?.outcome.status).to.equal('success');
     });
 
-    it('skips when achievement has no resultDescription', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.credentialSubject.result = [
-        {
-          type: 'Result',
-          resultDescription: 'https://example.com/result-descriptions/1',
-          value: 'Pass',
-        },
-      ];
-      // No achievement.resultDescription defined
+    it('fails when achievement has no resultDescription for referenced id', async () => {
+      const cred = compose(
+        CredentialFactory({ version: 'v2', credential: {} }),
+        addResults({
+          results: [
+            {
+              type: 'Result',
+              resultDescription: 'https://example.test/result-descriptions/1',
+              value: 'Pass',
+            },
+          ],
+          resultDescriptions: [],
+        }),
+      );
+      const cs = cred.credentialSubject as Record<string, unknown>;
+      const achievement = cs.achievement as Record<string, unknown>;
+      achievement.resultDescription = [];
 
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
       expect(refCheck?.outcome.status).to.equal('failure');
       if (refCheck?.outcome.status === 'failure') {
-        expect(refCheck.outcome.problems[0].type).to.equal('https://www.w3.org/TR/vc-data-model#OBV3_INVALID_RESULT_REFERENCE');
+        expect(refCheck.outcome.problems[0].type).to.equal(
+          'https://www.w3.org/TR/vc-data-model#OBV3_INVALID_RESULT_REFERENCE',
+        );
       }
     });
   });
 
-  describe('non-fatal behavior', () => {
-    it('suite is non-fatal even when checks fail', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      // Make credentialSubject.result with invalid reference
-      cred.credentialSubject.result = [
-        {
-          type: 'Result',
-          resultDescription: 'invalid-ref',
-        },
-      ];
-
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
-
-      // Suite should complete even with failures
-      expect(results).to.have.lengthOf(2);
-
-      // Both checks are non-fatal
-      const jsonCheck = results.find(r => r.check === 'schema.obv3.json');
-      const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
-
-      expect(jsonCheck?.outcome.status).to.be.oneOf(['success', 'failure', 'skipped']);
-      expect(refCheck?.outcome.status).to.be.oneOf(['success', 'failure', 'skipped']);
-    });
-  });
-
   describe('non-OBv3 credential types', () => {
-    it('skips or fails checks for non-OBv3 credentials', async () => {
-      const cred = JSON.parse(JSON.stringify(v1NoStatus));
-      // v1NoStatus has no OBv3 context
-
-      const subject = createSubject(cred);
-      const results = await runSuites([obv3SchemaSuite], subject, context);
+    it('skips both checks for plain VC without OBv3 context', async () => {
+      const cred = CredentialFactory({
+        version: 'v1',
+        credential: {
+          type: ['VerifiableCredential'],
+          '@context': [
+            'https://www.w3.org/2018/credentials/v1',
+            'https://w3id.org/security/suites/ed25519-2020/v1',
+          ],
+        },
+      });
+      const results = await runSuites(
+        [obv3SchemaSuite],
+        createSubject(cred),
+        buildContext(),
+      );
 
       expect(results).to.have.lengthOf(2);
-      // Both checks should either skip or fail since it's not OBv3
-      const allSkippedOrFailed = results.every(
-        r => r.outcome.status === 'skipped' || r.outcome.status === 'failure'
-      );
-      expect(allSkippedOrFailed).to.be.true;
+      expect(results.every(r => r.outcome.status === 'skipped')).to.be.true;
     });
   });
 });

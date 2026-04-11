@@ -53,20 +53,31 @@ export const signatureCheck: VerificationCheck = {
     };
 
     let cryptoResult;
-    if (presentation) {
-      cryptoResult = await service.verifyPresentation(presentation, cryptoOptions);
-    } else {
-      if (!credential) {
-        return {
-          status: 'failure',
-          problems: [{
-            type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
-            title: 'No Verifiable Content',
-            detail: 'No verifiable credential or presentation found in subject.',
-          }],
-        };
+    try {
+      if (presentation) {
+        cryptoResult = await service.verifyPresentation(presentation, cryptoOptions);
+      } else {
+        if (!credential) {
+          return {
+            status: 'failure',
+            problems: [{
+              type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+              title: 'No Verifiable Content',
+              detail: 'No verifiable credential or presentation found in subject.',
+            }],
+          };
+        }
+        cryptoResult = await service.verifyCredential(credential, cryptoOptions);
       }
-      cryptoResult = await service.verifyCredential(credential, cryptoOptions);
+    } catch (e) {
+      return {
+        status: 'failure',
+        problems: [{
+          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+          title: 'Verification Error',
+          detail: e instanceof Error ? e.message : 'An unexpected error occurred during signature verification.',
+        }],
+      };
     }
 
     if (cryptoResult.verified) {

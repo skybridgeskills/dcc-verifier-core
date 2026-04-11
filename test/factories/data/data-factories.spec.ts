@@ -19,14 +19,14 @@ describe('data factories', () => {
   });
 
   it("CredentialFactory({ version: 'v1' }) uses issuanceDate", () => {
-    const cred = CredentialFactory({ version: 'v1' });
+    const cred = CredentialFactory({ version: 'v1', credential: {} });
     expect(cred['@context']).to.include('https://www.w3.org/2018/credentials/v1');
     expect(cred).to.have.property('issuanceDate');
     expect(cred).to.not.have.property('validFrom');
   });
 
   it('compose + addResults cross-references results and descriptions', () => {
-    const cred = compose(CredentialFactory(), addResults({ count: 3 }));
+    const cred = compose(CredentialFactory({ credential: {} }), addResults({ count: 3 }));
     const cs = cred.credentialSubject as Record<string, unknown>;
     const achievement = cs.achievement as Record<string, unknown>;
     const results = cs.result as Array<{ resultDescription?: string }>;

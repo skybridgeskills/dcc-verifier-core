@@ -42,13 +42,15 @@ export const proofExistsCheck: VerificationCheck = {
       };
     }
 
-    // Proof can be a single object or an array of objects
-    const isValidProof = typeof proof === 'object' && proof !== null;
-    const isValidProofArray = Array.isArray(proof) && proof.length > 0 && proof.every(
-      p => typeof p === 'object' && p !== null
-    );
+    // Proof can be a single object or a non-empty array of objects
+    const isValidProofObject =
+      typeof proof === 'object' && proof !== null && !Array.isArray(proof);
+    const isValidProofArray =
+      Array.isArray(proof) &&
+      proof.length > 0 &&
+      proof.every(p => typeof p === 'object' && p !== null);
 
-    if (!isValidProof && !isValidProofArray) {
+    if (!isValidProofObject && !isValidProofArray) {
       return {
         status: 'failure',
         problems: [{

@@ -4,23 +4,28 @@ import { registrySuite } from '../../src/suites/registry/index.js';
 import { buildContext } from '../../src/defaults.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { VerificationContext } from '../../src/types/context.js';
+import type { EntityIdentityRegistry } from '../../src/types/registry.js';
+import { CredentialFactory } from '../factories/data/credential-factory.js';
+import { FakeRegistryLookup } from '../factories/services/fake-registry-lookup.js';
 
-// Import test fixtures
-import { v2NoStatus } from '../../src/test-fixtures/verifiableCredentials/v2/v2NoStatus.js';
-import { knownDIDRegistries } from '../../src/test-fixtures/knownDIDRegistries.js';
+const testRegistries: EntityIdentityRegistry[] = [
+  {
+    name: 'Unit Test Registry',
+    type: 'dcc-legacy',
+    url: 'https://factory.test/registry/legacy.json',
+  },
+];
 
 describe('Registry Suite', () => {
   const baseContext = buildContext();
 
-  // Helper to create subject from credential
   const createSubject = (credential: unknown): VerificationSubject => ({
     verifiableCredential: credential,
   });
 
   describe('no registries in context', () => {
     it('skips check when no registries configured', async () => {
-      const subject = createSubject(v2NoStatus);
-      // Use context without registries
+      const subject = createSubject(CredentialFactory({ version: 'v2', credential: {} }));
       const context: VerificationContext = {
         ...baseContext,
         registries: undefined,
@@ -36,51 +41,92 @@ describe('Registry Suite', () => {
     });
   });
 
-  describe('issuer lookup', () => {
-    it.skip('succeeds when issuer found in registry (requires network)', async function() {
-      this.timeout(60000);
-      // This would require actual registry access
-      const subject = createSubject(v2NoStatus);
+  describe('issuer lookup (fake)', () => {
+    it('succeeds when issuer found in registry', async () => {
+      const subject = createSubject(CredentialFactory({ version: 'v2', credential: {} }));
       const context: VerificationContext = {
         ...baseContext,
-        registries: knownDIDRegistries,
+        registries: testRegistries,
+        lookupIssuers: FakeRegistryLookup({
+          found: true,
+          matchingRegistries: ['Unit Test Registry'],
+        }),
       };
       const results = await runSuites([registrySuite], subject, context);
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('success');
+      if (results[0].outcome.status === 'success') {
+        expect(results[0].outcome.message).to.include('Unit Test Registry');
+      }
     });
 
-    it.skip('fails when issuer not in registry (requires network)', async function() {
-      this.timeout(60000);
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      // Use an issuer DID that's not in any registry
-      cred.issuer = { id: 'did:key:z9999999999999999999999999999999999999999999' };
-
-      const subject = createSubject(cred);
+    it('fails when issuer not in registry', async () => {
+      const subject = createSubject(CredentialFactory({ version: 'v2', credential: {} }));
       const context: VerificationContext = {
         ...baseContext,
-        registries: knownDIDRegistries,
+        registries: testRegistries,
+        lookupIssuers: FakeRegistryLookup({ found: false }),
       };
       const results = await runSuites([registrySuite], subject, context);
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('failure');
       if (results[0].outcome.status === 'failure') {
-        expect(results[0].outcome.problems[0].type).to.equal('https://www.w3.org/TR/vc-data-model#ISSUER_NOT_REGISTERED');
+        expect(results[0].outcome.problems[0].type).to.equal(
+          'https://www.w3.org/TR/vc-data-model#ISSUER_NOT_REGISTERED',
+        );
+      }
+    });
+
+    it('returns REGISTRY_ERROR when lookup throws', async () => {
+      const subject = createSubject(CredentialFactory({ version: 'v2', credential: {} }));
+      const context: VerificationContext = {
+        ...baseContext,
+        registries: testRegistries,
+        lookupIssuers: FakeRegistryLookup({ error: new Error('Network failure') }),
+      };
+      const results = await runSuites([registrySuite], subject, context);
+
+      expect(results[0].outcome.status).to.equal('failure');
+      if (results[0].outcome.status === 'failure') {
+        expect(results[0].outcome.problems[0].type).to.equal(
+          'https://www.w3.org/TR/vc-data-model#REGISTRY_ERROR',
+        );
+        expect(results[0].outcome.problems[0].detail).to.include('Network failure');
+      }
+    });
+
+    it('reports unchecked registries when provided', async () => {
+      const subject = createSubject(CredentialFactory({ version: 'v2', credential: {} }));
+      const context: VerificationContext = {
+        ...baseContext,
+        registries: testRegistries,
+        lookupIssuers: FakeRegistryLookup({
+          found: true,
+          matchingRegistries: ['Unit Test Registry'],
+          uncheckedRegistries: ['Other Registry'],
+        }),
+      };
+      const results = await runSuites([registrySuite], subject, context);
+
+      expect(results[0].outcome.status).to.equal('success');
+      if (results[0].outcome.status === 'success') {
+        expect(results[0].outcome.message).to.include('could not be checked');
       }
     });
   });
 
   describe('missing issuer', () => {
     it('fails when credential has no issuer', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      delete cred.issuer;
+      const cred = CredentialFactory({ version: 'v2', credential: {} });
+      delete (cred as { issuer?: unknown }).issuer;
 
       const subject = createSubject(cred);
       const context: VerificationContext = {
         ...baseContext,
-        registries: knownDIDRegistries,
+        registries: testRegistries,
+        lookupIssuers: FakeRegistryLookup({ found: true }),
       };
       const results = await runSuites([registrySuite], subject, context);
 
@@ -92,35 +138,22 @@ describe('Registry Suite', () => {
     });
 
     it('handles issuer as string', async () => {
-      const cred = JSON.parse(JSON.stringify(v2NoStatus));
-      cred.issuer = 'did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q';
+      const cred = CredentialFactory({
+        version: 'v2',
+        credential: { issuer: 'did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q' },
+      });
 
       const subject = createSubject(cred);
       const context: VerificationContext = {
         ...baseContext,
-        registries: knownDIDRegistries,
+        registries: testRegistries,
+        lookupIssuers: FakeRegistryLookup({ found: true }),
       };
-      // Should attempt lookup (may fail due to sandbox, but should run)
       const results = await runSuites([registrySuite], subject, context);
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].check).to.equal('registry.issuer');
-    });
-  });
-
-  describe('non-fatal behavior', () => {
-    it('is non-fatal even when lookup fails', async function() {
-      this.timeout(30000);
-      const subject = createSubject(v2NoStatus);
-      const context: VerificationContext = {
-        ...baseContext,
-        registries: knownDIDRegistries,
-      };
-      const results = await runSuites([registrySuite], subject, context);
-
-      expect(results).to.have.lengthOf(1);
-      // Registry check is non-fatal, so even failure is acceptable
-      expect(results[0].outcome.status).to.be.oneOf(['success', 'failure', 'skipped']);
+      expect(results[0].outcome.status).to.equal('success');
     });
   });
 
@@ -129,12 +162,11 @@ describe('Registry Suite', () => {
       const subject: VerificationSubject = {};
       const context: VerificationContext = {
         ...baseContext,
-        registries: knownDIDRegistries,
+        registries: testRegistries,
+        lookupIssuers: FakeRegistryLookup({ found: true }),
       };
       const results = await runSuites([registrySuite], subject, context);
 
-      // The check has appliesTo: ['verifiableCredential'], so when there's no
-      // credential, the check is filtered out entirely by the orchestrator
       expect(results).to.have.lengthOf(0);
     });
   });

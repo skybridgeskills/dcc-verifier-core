@@ -110,5 +110,7 @@ export function buildContext(overrides?: Partial<VerificationContext>): Verifica
     lookupIssuers: overrides?.lookupIssuers ?? defaultLookupIssuers,
     challenge: overrides?.challenge ?? null,
     unsignedPresentation: overrides?.unsignedPresentation ?? false,
+    verifyBitstringStatusListCredential:
+      overrides?.verifyBitstringStatusListCredential ?? true,
   };
 }

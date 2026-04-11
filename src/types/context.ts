@@ -65,4 +65,9 @@ export interface VerificationContext {
   challenge?: string | null;
   /** Whether to allow unsigned presentations (skip VP signature check). */
   unsignedPresentation?: boolean;
+  /**
+   * When true (default), verify the BitstringStatusListCredential proof before reading
+   * revocation bits. Set false for tests with unsigned list credentials from factories.
+   */
+  verifyBitstringStatusListCredential?: boolean;
 }

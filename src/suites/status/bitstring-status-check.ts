@@ -172,22 +172,31 @@ export const bitstringStatusCheck: VerificationCheck = {
     }
 
     try {
-      // Perform the status check
-      const result = await checkStatus({
+      const verifySl =
+        context.verifyBitstringStatusListCredential ?? true;
+
+      const statusResult = (await checkStatus({
         credential,
         documentLoader: context.documentLoader,
-        verifyStatusListCredential: true,
-      });
+        suite: context.cryptoSuites,
+        verifyBitstringStatusListCredential: verifySl,
+        verifyMatchingIssuers: true,
+      })) as { verified?: boolean; error?: unknown };
 
-      // checkStatus returns true if valid (not revoked/suspended), false otherwise
-      if (result === true) {
+      if (statusResult.error !== undefined) {
+        return {
+          status: 'failure',
+          problems: classifyStatusError(statusResult.error),
+        };
+      }
+
+      if (statusResult.verified === true) {
         return {
           status: 'success',
           message: 'Credential status is valid (not revoked or suspended).',
         };
       }
 
-      // Status check returned false - credential is revoked or suspended
       return {
         status: 'failure',
         problems: [{
@@ -197,7 +206,6 @@ export const bitstringStatusCheck: VerificationCheck = {
         }],
       };
     } catch (error) {
-      // Error during status check
       const problems = classifyStatusError(error);
       return {
         status: 'failure',

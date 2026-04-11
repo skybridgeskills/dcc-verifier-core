@@ -35,6 +35,19 @@ describe('service factories', () => {
       }
     });
 
+    it('rejects verifyCredential when throwInVerify is set', async () => {
+      const svc = FakeCryptoService({
+        throwInVerify: new Error('injected fault'),
+      });
+      try {
+        await svc.verifyCredential({}, { documentLoader: async () => ({}) });
+        expect.fail('expected throw');
+      } catch (e) {
+        expect(e).to.be.instanceOf(Error);
+        expect((e as Error).message).to.equal('injected fault');
+      }
+    });
+
     it('uses custom canVerify (Data Integrity only)', () => {
       const svc = FakeCryptoService({
         canVerify: hasDataIntegrityProof,

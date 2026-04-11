@@ -46,21 +46,24 @@ export function PlaceholderProof(
 
 export type CredentialVersion = 'v1' | 'v2';
 
-export type CredentialFactoryInput = {
+export type CredentialFactoryOptions = {
   version?: CredentialVersion;
-} & Record<string, unknown>;
+  credential?: Record<string, unknown>;
+};
 
 /**
  * Minimal Open Badge / VC credential with OBv3 contexts and placeholder proof.
  */
 export function CredentialFactory(
-  overrides: CredentialFactoryInput = {},
+  options: CredentialFactoryOptions = {},
 ): Record<string, unknown> {
-  const version = overrides.version ?? 'v2';
-  const { version: _omitVersion, ...patch } = overrides;
+  const version = options.version ?? 'v2';
+  const credentialPatch = options.credential ?? {};
 
   const id =
-    typeof patch.id === 'string' ? patch.id : `urn:uuid:${crypto.randomUUID()}`;
+    typeof credentialPatch.id === 'string'
+      ? credentialPatch.id
+      : 'https://example.test/credentials/factory';
 
   const base: Record<string, unknown> =
     version === 'v1'
@@ -101,5 +104,5 @@ export function CredentialFactory(
           proof: PlaceholderProof(),
         };
 
-  return deepMerge(base, patch);
+  return deepMerge(base, credentialPatch);
 }
