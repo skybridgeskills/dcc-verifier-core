@@ -110,6 +110,10 @@ jspm_packages/
 *~
 *.sw[nop]
 /.vscode
+.cursor
+
+# local development notes
+docs/plans 
 
 # Output
 dist
