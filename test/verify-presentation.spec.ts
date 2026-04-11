@@ -127,9 +127,10 @@ describe('verifyPresentation', () => {
       const presentation = createSignedPresentation([v1NoStatus, badCredential]);
       const result = await verifyPresentation({ presentation });
 
-      // Should be unverified because one credential failed
+      // Presentation fails parsing because embedded credential is invalid
+      // (Zod validates embedded credentials against CredentialSchema)
       expect(result.verified).to.be.false;
-      expect(result.credentialResults.some(cr => !cr.verified)).to.be.true;
+      expect(result.presentationResults[0]?.outcome.status).to.equal('failure');
     });
 
     it('separates credential results correctly', async () => {

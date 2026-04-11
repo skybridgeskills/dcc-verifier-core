@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const IssuerObjectSchema = z.object({
   id: z.string(),
-  type: z.string().optional(),
+  type: z.union([z.string(), z.array(z.string())]).optional(),
   name: z.string().optional(),
   url: z.string().optional(),
   image: z.union([z.string(), z.object({ id: z.string(), type: z.string() })]).optional(),

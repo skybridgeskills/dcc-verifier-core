@@ -22,14 +22,18 @@ import { extractCredentialsFrom } from './extractCredentialsFrom.js';
 import { ProblemDetail } from './types/problem-detail.js';
 
 /**
- * Check if any check results have failures.
+ * Check if any check results have **fatal** failures.
+ * Non-fatal failures (e.g., optional schema validation) do not affect
+ * the overall `verified` status — they are recorded in results but don't
+ * invalidate the credential.
  */
-function hasFailures(results: CheckResult[]): boolean {
-  return results.some(r => r.outcome.status === 'failure');
+function hasFatalFailures(results: CheckResult[]): boolean {
+  return results.some(r => r.fatal && r.outcome.status === 'failure');
 }
 
 /**
  * Create a parse error check result.
+ * Parsing failures are always fatal - malformed credentials can't be verified.
  */
 function createParseErrorResult(problem: ProblemDetail): CheckResult {
   return {
@@ -40,6 +44,7 @@ function createParseErrorResult(problem: ProblemDetail): CheckResult {
       problems: [problem],
     },
     timestamp: new Date().toISOString(),
+    fatal: true,
   };
 }
 
@@ -103,8 +108,8 @@ export async function verifyCredential(
   // Step 5: Run suites
   const results = await runSuites(suites, subject, context);
 
-  // Step 6: Derive verified status
-  const verified = !hasFailures(results);
+  // Step 6: Derive verified status (only fatal failures invalidate the credential)
+  const verified = !hasFatalFailures(results);
 
   // Step 7: Return result
   return {
@@ -207,8 +212,8 @@ export async function verifyPresentation(
   const allCredentialChecks = credentialResults.flatMap(cr => cr.results);
   const allResults = [...presentationResults, ...allCredentialChecks];
 
-  // Step 6: Derive verified status
-  const presentationVerified = !hasFailures(presentationResults);
+  // Step 6: Derive verified status (only fatal failures invalidate)
+  const presentationVerified = !hasFatalFailures(presentationResults);
   const allCredentialsVerified = credentialResults.every(cr => cr.verified);
   const verified = presentationVerified && allCredentialsVerified;
 

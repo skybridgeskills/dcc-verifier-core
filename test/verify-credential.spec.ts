@@ -42,11 +42,11 @@ describe('verifyCredential', () => {
 
       const result = await verifyCredential({ credential: badCredential });
 
+      // Missing @context fails Zod parsing (envelope validation)
       expect(result.verified).to.be.false;
-      const coreContextCheck = result.results.find(
-        r => r.suite === 'core' && r.check === 'core.context-exists'
-      );
-      expect(coreContextCheck?.outcome.status).to.equal('failure');
+      expect(result.results.length).to.be.greaterThan(0);
+      expect(result.results[0].suite).to.equal('parsing');
+      expect(result.results[0].outcome.status).to.equal('failure');
     });
 
     it('returns verified: false for credential with missing type', async () => {

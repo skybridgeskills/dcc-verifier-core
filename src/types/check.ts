@@ -46,6 +46,12 @@ export interface CheckResult {
   outcome: CheckOutcome;
   /** ISO 8601 timestamp when the check was executed. */
   timestamp: string;
+  /**
+   * Whether this check was marked fatal in its suite definition.
+   * Fatal failures affect the overall `verified` status; non-fatal ones
+   * are informational/warnings only.
+   */
+  fatal?: boolean;
 }
 
 /**

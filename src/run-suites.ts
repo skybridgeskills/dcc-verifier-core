@@ -62,6 +62,7 @@ export async function runSuites(
         suite: suite.id,
         outcome,
         timestamp: new Date().toISOString(),
+        fatal: check.fatal,
       });
 
       // Fatal failure stops remaining checks in this suite only
