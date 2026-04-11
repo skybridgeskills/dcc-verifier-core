@@ -14,6 +14,16 @@ const STATUS_SIGNATURE_ERROR = 'Verification error';
 const STATUS_TYPE_ERROR = 'Status list credential type must include "BitstringStatusListCredential".';
 const STATUS_NOT_YET_VALID_ERROR = 'is before "validFrom"';
 
+function statusTypeString(type: unknown): string | undefined {
+  if (typeof type === 'string') {
+    return type;
+  }
+  if (Array.isArray(type) && typeof type[0] === 'string') {
+    return type[0];
+  }
+  return undefined;
+}
+
 /**
  * Check if the credential has a valid status type that we can check.
  */
@@ -32,7 +42,7 @@ function hasBitstringStatusList(credential: Record<string, unknown>): boolean {
   }
 
   const [firstStatus] = statuses;
-  const statusType = firstStatus?.type as string | undefined;
+  const statusType = statusTypeString(firstStatus?.type);
 
   return statusType === 'BitstringStatusListEntry';
 }
@@ -52,7 +62,7 @@ function getStatusType(credential: Record<string, unknown>): string | undefined 
     return undefined;
   }
 
-  return statuses[0]?.type as string | undefined;
+  return statusTypeString(statuses[0]?.type);
 }
 
 /**
@@ -180,7 +190,8 @@ export const bitstringStatusCheck: VerificationCheck = {
         documentLoader: context.documentLoader,
         suite: context.cryptoSuites,
         verifyBitstringStatusListCredential: verifySl,
-        verifyMatchingIssuers: true,
+        // Hosted status lists may use a different issuer than the VC (see DataIntegrityCryptoService).
+        verifyMatchingIssuers: false,
       })) as { verified?: boolean; error?: unknown };
 
       if (statusResult.error !== undefined) {

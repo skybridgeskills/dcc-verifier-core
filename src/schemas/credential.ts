@@ -7,7 +7,8 @@ const ContextSchema = JsonLdField(z.union([z.string(), z.record(z.unknown())]));
 
 const CredentialStatusSchema = z.object({
   id: z.string(),
-  type: JsonLdField(z.string()),
+  /** Preserve string vs array — normalizing to array breaks LD signature verification. */
+  type: z.union([z.string(), z.array(z.string())]),
   statusPurpose: z.string(),
   statusListIndex: z.union([z.string(), z.number()]),
   statusListCredential: z.string(),

@@ -4,6 +4,7 @@
  */
 
 import { verifyCredential as vcVerifyCredential, verify as vcVerifyPresentation } from '@digitalcredentials/vc';
+import { checkStatus as bitstringCredentialStatusCheck } from '@digitalcredentials/vc-bitstring-status-list';
 import jsonLdSignatures from '@digitalcredentials/jsonld-signatures';
 import type { CryptoResult, CryptoService, CryptoVerifyOptions } from '../types/crypto-service.js';
 import type { CryptoSuite, ProofPurpose } from '../types/crypto-suite.js';
@@ -144,12 +145,26 @@ export interface DataIntegrityCryptoConfig {
   suites: CryptoSuite[];
 }
 
+function bitstringCheckStatusForVc(suites: CryptoSuite[]) {
+  return async (vcOptions: Record<string, unknown>) =>
+    bitstringCredentialStatusCheck({
+      credential: vcOptions.credential,
+      documentLoader: vcOptions.documentLoader,
+      suite: suites,
+      verifyBitstringStatusListCredential: true,
+      // Match `verifyMatchingIssuers: false` on the vc call — hosted status lists
+      // may not share the VC issuer id (e.g. did:web + GitHub-hosted list).
+      verifyMatchingIssuers: false,
+    });
+}
+
 /**
  * Builds a {@link CryptoService} that verifies via `@digitalcredentials/vc` using the
  * given proof suites (e.g. Ed25519Signature2020 + DataIntegrityProof).
  */
 export function DataIntegrityCryptoService(config: DataIntegrityCryptoConfig): CryptoService {
   const { suites } = config;
+  const checkStatus = bitstringCheckStatusForVc(suites);
 
   return {
     canVerify: (subject: VerificationSubject): boolean => {
@@ -171,7 +186,7 @@ export function DataIntegrityCryptoService(config: DataIntegrityCryptoConfig): C
           credential,
           suite: suites,
           documentLoader: options.documentLoader,
-          checkStatus: null,
+          checkStatus,
           verifyMatchingIssuers: false,
         });
 
@@ -212,7 +227,7 @@ export function DataIntegrityCryptoService(config: DataIntegrityCryptoConfig): C
           suite: suites,
           documentLoader: options.documentLoader,
           unsignedPresentation: options.unsignedPresentation ?? false,
-          checkStatus: null,
+          checkStatus,
           challenge: options.challenge ?? 'meaningless',
           verifyMatchingIssuers: false,
         });
