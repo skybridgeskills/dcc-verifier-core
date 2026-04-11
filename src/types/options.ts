@@ -9,6 +9,7 @@
 
 import { VerificationSuite } from './check.js';
 import { DocumentLoader } from './context.js';
+import type { CryptoSuite } from './crypto-suite.js';
 import type { EntityIdentityRegistry } from './registry.js';
 
 /**
@@ -33,7 +34,7 @@ export interface VerifyCredentialOptions {
   documentLoader?: DocumentLoader;
 
   /** Custom crypto suites for signature verification */
-  cryptoSuites?: object[];
+  cryptoSuites?: CryptoSuite[];
 }
 
 /**
@@ -65,5 +66,5 @@ export interface VerifyPresentationOptions {
   documentLoader?: DocumentLoader;
 
   /** Custom crypto suites for signature verification */
-  cryptoSuites?: object[];
+  cryptoSuites?: CryptoSuite[];
 }

@@ -1,6 +1,7 @@
 import { verifyCredential as vcVerifyCredential, verify as vcVerifyPresentation } from '@digitalcredentials/vc';
 import jsonLdSignatures from '@digitalcredentials/jsonld-signatures';
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
+import type { ProofPurpose } from '../../types/crypto-suite.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
@@ -117,7 +118,7 @@ function classifySignatureError(
 /**
  * Get the proof purpose for presentation verification.
  */
-function getPresentationPurpose(presentation: Record<string, unknown>, challenge: string | null | undefined): unknown {
+function getPresentationPurpose(presentation: Record<string, unknown>, challenge: string | null | undefined): ProofPurpose {
   const proof = presentation.proof as Record<string, unknown> | Array<Record<string, unknown>> | undefined;
 
   // Get proofPurpose from proof (could be single proof or array)

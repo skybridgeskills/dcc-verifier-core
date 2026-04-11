@@ -12,6 +12,7 @@ import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020
 import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
+import { CryptoSuite } from './types/crypto-suite.js';
 import { VerificationContext } from './types/context.js';
 import { VerificationSuite } from './types/check.js';
 
@@ -40,7 +41,7 @@ export const defaultDocumentLoader = securityLoader({ fetchRemoteContexts: true 
  * - Ed25519Signature2020 (older Linked Data Proof)
  * - EdDSA/RDFC 2022 (newer Data Integrity Proof)
  */
-export const defaultCryptoSuites = [ed25519Suite, eddsaSuite];
+export const defaultCryptoSuites: CryptoSuite[] = [ed25519Suite, eddsaSuite];
 
 /**
  * Default verification suites, run in order for every credential:

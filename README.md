@@ -82,7 +82,7 @@ interface VerifyCredentialOptions {
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
   documentLoader?: DocumentLoader;
-  cryptoSuites?: object[];
+  cryptoSuites?: CryptoSuite[];
 }
 ```
 
@@ -216,7 +216,7 @@ interface VerifyPresentationOptions {
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
   documentLoader?: DocumentLoader;
-  cryptoSuites?: object[];
+  cryptoSuites?: CryptoSuite[];
 }
 ```
 

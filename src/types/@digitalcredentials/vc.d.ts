@@ -6,12 +6,11 @@
  * to avoid conflicts while still providing proper function signatures.
  */
 
-// Use the project's own types or 'any' to avoid conflicts
+import type { CryptoSuite, ProofPurpose } from '../crypto-suite.js';
+
 type AnyCredential = any;
 type AnyPresentation = any;
 type AnyProof = any;
-type AnySuite = any;
-type AnyPurpose = any;
 type AnyDocumentLoader = any;
 type AnyStatusResult = any;
 
@@ -40,23 +39,23 @@ export interface VerifyPresentationResult {
 // Options interfaces with permissive types
 export interface IssueOptions {
   credential: AnyCredential;
-  suite: AnySuite | AnySuite[];
-  purpose?: AnyPurpose;
+  suite: CryptoSuite | CryptoSuite[];
+  purpose?: ProofPurpose;
   documentLoader?: AnyDocumentLoader;
   now?: string | Date;
 }
 
 export interface DeriveOptions {
   verifiableCredential: AnyCredential;
-  suite: AnySuite | AnySuite[];
+  suite: CryptoSuite | CryptoSuite[];
   documentLoader?: AnyDocumentLoader;
 }
 
 export interface VerifyOptions {
   presentation?: AnyPresentation;
-  suite: AnySuite | AnySuite[];
+  suite: CryptoSuite | CryptoSuite[];
   unsignedPresentation?: boolean;
-  presentationPurpose?: AnyPurpose;
+  presentationPurpose?: ProofPurpose;
   challenge?: string | null;
   controller?: string | object;
   domain?: string;
@@ -68,8 +67,8 @@ export interface VerifyOptions {
 
 export interface VerifyCredentialOptions {
   credential: AnyCredential;
-  suite: AnySuite | AnySuite[];
-  purpose?: AnyPurpose;
+  suite: CryptoSuite | CryptoSuite[];
+  purpose?: ProofPurpose;
   documentLoader?: AnyDocumentLoader;
   // TODO: undefined is preferred over null as it matches the JSDoc types
   checkStatus?: CheckStatusFunction | null | undefined; 
@@ -88,8 +87,8 @@ export interface CreatePresentationOptions {
 
 export interface SignPresentationOptions {
   presentation: AnyPresentation;
-  suite: AnySuite | AnySuite[];
-  purpose?: AnyPurpose;
+  suite: CryptoSuite | CryptoSuite[];
+  purpose?: ProofPurpose;
   domain?: string;
   challenge?: string;
   documentLoader?: AnyDocumentLoader;

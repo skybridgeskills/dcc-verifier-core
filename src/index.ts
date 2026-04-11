@@ -14,6 +14,7 @@ export type { EntityIdentityRegistry } from './types/registry.js';
 export type { CheckResult, CheckOutcome, VerificationCheck, VerificationSuite, VerificationSubjectType } from './types/check.js';
 export type { ProblemDetail } from './types/problem-detail.js';
 export type { VerificationContext, DocumentLoader } from './types/context.js';
+export type { CryptoSuite, LinkedDataSuite, DataIntegritySuite, ProofPurpose } from './types/crypto-suite.js';
 export type { VerificationSubject } from './types/subject.js';
 
 // ==================== Schema Types and Parsing ====================

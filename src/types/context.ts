@@ -10,6 +10,7 @@
  * dependencies directly — it reads them from the context.
  */
 
+import type { CryptoSuite } from './crypto-suite.js';
 import type { EntityIdentityRegistry } from './registry.js';
 
 /**
@@ -29,7 +30,7 @@ export type DocumentLoader = (url: string) => Promise<unknown>;
  */
 export interface VerificationContext {
   documentLoader: DocumentLoader;
-  cryptoSuites: object[];
+  cryptoSuites: CryptoSuite[];
   registries?: EntityIdentityRegistry[];
   /** Expected challenge for VP authentication proof purpose. */
   challenge?: string | null;
