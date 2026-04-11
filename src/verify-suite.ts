@@ -82,7 +82,10 @@ export async function verifyCredential(
   const registries = opts.registries ?? opts.knownDIDRegistries;
   const context = buildContext({
     documentLoader: opts.documentLoader,
+    fetchJson: opts.fetchJson,
     cryptoSuites: opts.cryptoSuites,
+    cryptoServices: opts.cryptoServices,
+    lookupIssuers: opts.lookupIssuers,
     registries,
   });
 
@@ -152,7 +155,10 @@ export async function verifyPresentation(
   const registries = opts.registries ?? opts.knownDIDRegistries;
   const context = buildContext({
     documentLoader: opts.documentLoader,
+    fetchJson: opts.fetchJson,
     cryptoSuites: opts.cryptoSuites,
+    cryptoServices: opts.cryptoServices,
+    lookupIssuers: opts.lookupIssuers,
     registries,
     challenge: opts.challenge ?? null,
     unsignedPresentation: opts.unsignedPresentation ?? false,
@@ -188,7 +194,10 @@ export async function verifyPresentation(
         registries,
         additionalSuites: opts.additionalSuites,
         documentLoader: opts.documentLoader,
+        fetchJson: opts.fetchJson,
         cryptoSuites: opts.cryptoSuites,
+        cryptoServices: opts.cryptoServices,
+        lookupIssuers: opts.lookupIssuers,
       });
       credentialResults.push(credResult);
     }

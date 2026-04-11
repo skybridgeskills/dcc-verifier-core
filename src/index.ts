@@ -7,13 +7,18 @@
 export { verifyCredential, verifyPresentation } from './verify-suite.js';
 export type { CredentialVerificationResult, PresentationVerificationResult } from './types/result.js';
 export type { VerifyCredentialOptions, VerifyPresentationOptions } from './types/options.js';
-export type { EntityIdentityRegistry } from './types/registry.js';
+export type {
+  EntityIdentityRegistry,
+  RegistryLookupResult,
+  LookupIssuers,
+} from './types/registry.js';
 
 // ==================== Core Types ====================
 
 export type { CheckResult, CheckOutcome, VerificationCheck, VerificationSuite, VerificationSubjectType } from './types/check.js';
 export type { ProblemDetail } from './types/problem-detail.js';
-export type { VerificationContext, DocumentLoader } from './types/context.js';
+export type { VerificationContext, DocumentLoader, FetchJson } from './types/context.js';
+export type { CryptoService, CryptoResult, CryptoVerifyOptions } from './types/crypto-service.js';
 export type { CryptoSuite, LinkedDataSuite, DataIntegritySuite, ProofPurpose } from './types/crypto-suite.js';
 export type { VerificationSubject } from './types/subject.js';
 
@@ -34,5 +39,11 @@ export { obv3SchemaSuite } from './suites/schema/index.js';
 // ==================== Utilities ====================
 
 export { runSuites } from './run-suites.js';
-export { buildContext, defaultSuites, defaultDocumentLoader, defaultCryptoSuites } from './defaults.js';
+export {
+  buildContext,
+  defaultSuites,
+  defaultDocumentLoader,
+  defaultFetchJson,
+  defaultCryptoSuites,
+} from './defaults.js';
 export { extractCredentialsFrom } from './extractCredentialsFrom.js';

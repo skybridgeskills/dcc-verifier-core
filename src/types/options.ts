@@ -8,9 +8,10 @@
  */
 
 import { VerificationSuite } from './check.js';
-import { DocumentLoader } from './context.js';
+import type { DocumentLoader, FetchJson } from './context.js';
+import type { CryptoService } from './crypto-service.js';
 import type { CryptoSuite } from './crypto-suite.js';
-import type { EntityIdentityRegistry } from './registry.js';
+import type { EntityIdentityRegistry, LookupIssuers } from './registry.js';
 
 /**
  * Options for `verifyCredential`.
@@ -33,8 +34,17 @@ export interface VerifyCredentialOptions {
   /** Custom document loader (defaults to securityLoader) */
   documentLoader?: DocumentLoader;
 
+  /** Plain JSON fetcher (defaults to fetch + json(); used by OBv3 schema after phase 3) */
+  fetchJson?: FetchJson;
+
   /** Custom crypto suites for signature verification */
   cryptoSuites?: CryptoSuite[];
+
+  /** Pluggable crypto services (phase 2; optional today) */
+  cryptoServices?: CryptoService[];
+
+  /** Custom registry lookup (phase 3; optional today) */
+  lookupIssuers?: LookupIssuers;
 }
 
 /**
@@ -65,6 +75,15 @@ export interface VerifyPresentationOptions {
   /** Custom document loader (defaults to securityLoader) */
   documentLoader?: DocumentLoader;
 
+  /** Plain JSON fetcher (defaults to fetch + json(); used by OBv3 schema after phase 3) */
+  fetchJson?: FetchJson;
+
   /** Custom crypto suites for signature verification */
   cryptoSuites?: CryptoSuite[];
+
+  /** Pluggable crypto services (phase 2; optional today) */
+  cryptoServices?: CryptoService[];
+
+  /** Custom registry lookup (phase 3; optional today) */
+  lookupIssuers?: LookupIssuers;
 }

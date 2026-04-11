@@ -35,3 +35,20 @@ export interface DccLegacyEntityIdentityRegistry extends BaseEntityIdentityRegis
 export type EntityIdentityRegistry =
   | OidfEntityIdentityRegistry
   | DccLegacyEntityIdentityRegistry;
+
+/**
+ * Normalized result of an issuer registry lookup (port output for `lookupIssuers`).
+ */
+export interface RegistryLookupResult {
+  found: boolean;
+  matchingRegistries: string[];
+  uncheckedRegistries: string[];
+}
+
+/**
+ * Looks up whether an issuer DID is registered in the configured registries.
+ */
+export type LookupIssuers = (
+  did: string,
+  registries: EntityIdentityRegistry[]
+) => Promise<RegistryLookupResult>;

@@ -9,6 +9,7 @@ describe('runSuites', () => {
   // Mock context for testing
   const mockContext: VerificationContext = {
     documentLoader: async () => ({}),
+    fetchJson: async () => ({}),
     cryptoSuites: [],
     challenge: null,
     unsignedPresentation: false,

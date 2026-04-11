@@ -121,6 +121,7 @@ describe('Foundation types', () => {
       const subject: VerificationSubject = { verifiableCredential: {} };
       const context: VerificationContext = {
         documentLoader: async () => ({}),
+        fetchJson: async () => ({}),
         cryptoSuites: [],
       };
 

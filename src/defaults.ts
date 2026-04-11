@@ -13,7 +13,7 @@ import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
 import { CryptoSuite } from './types/crypto-suite.js';
-import { VerificationContext } from './types/context.js';
+import { VerificationContext, FetchJson } from './types/context.js';
 import { VerificationSuite } from './types/check.js';
 
 import { coreSuite } from './suites/core/index.js';
@@ -33,6 +33,19 @@ const ed25519Suite = new Ed25519Signature2020();
  * bundled and cached; unknown contexts are fetched from the network.
  */
 export const defaultDocumentLoader = securityLoader({ fetchRemoteContexts: true }).build();
+
+/**
+ * Default plain-JSON fetcher (AJV schema load, future OIDF/OIDC/JWKS).
+ *
+ * Uses the global `fetch` API. Not used for JSON-LD — see {@link defaultDocumentLoader}.
+ */
+export const defaultFetchJson: FetchJson = async (url: string) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
+  }
+  return response.json();
+};
 
 /**
  * Default crypto suites for signature verification.
@@ -74,8 +87,11 @@ export const defaultSuites: VerificationSuite[] = [
 export function buildContext(overrides?: Partial<VerificationContext>): VerificationContext {
   return {
     documentLoader: overrides?.documentLoader ?? defaultDocumentLoader,
+    fetchJson: overrides?.fetchJson ?? defaultFetchJson,
     cryptoSuites: overrides?.cryptoSuites ?? defaultCryptoSuites,
+    cryptoServices: overrides?.cryptoServices,
     registries: overrides?.registries,
+    lookupIssuers: overrides?.lookupIssuers,
     challenge: overrides?.challenge ?? null,
     unsignedPresentation: overrides?.unsignedPresentation ?? false,
   };
