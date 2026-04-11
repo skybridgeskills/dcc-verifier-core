@@ -44,15 +44,17 @@ export interface VerificationContext {
   fetchJson: FetchJson;
   /**
    * Linked Data Proof / Data Integrity suite instances for `@digitalcredentials/vc`.
-   * Used by the proof suite until {@link cryptoServices} fully replaces this path (phase 2).
+   *
+   * Mirrored into the default {@link cryptoServices} entry by `buildContext()`. Callers may
+   * override {@link cryptoServices} alone; this field stays in sync when only `cryptoSuites`
+   * is overridden.
    */
   cryptoSuites: CryptoSuite[];
   /**
    * Pluggable crypto verification services (Data Integrity today; JWT / others later).
-   * When provided and non-empty, the proof suite will prefer these over {@link cryptoSuites}
-   * (wired in phase 2).
+   * The proof suite dispatches to the first service whose `canVerify(subject)` is true.
    */
-  cryptoServices?: CryptoService[];
+  cryptoServices: CryptoService[];
   registries?: EntityIdentityRegistry[];
   /**
    * Optional issuer registry lookup. When omitted, the registry check uses the default

@@ -123,6 +123,7 @@ describe('Foundation types', () => {
         documentLoader: async () => ({}),
         fetchJson: async () => ({}),
         cryptoSuites: [],
+        cryptoServices: [],
       };
 
       const outcomes = await Promise.all(

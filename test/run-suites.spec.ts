@@ -11,6 +11,7 @@ describe('runSuites', () => {
     documentLoader: async () => ({}),
     fetchJson: async () => ({}),
     cryptoSuites: [],
+    cryptoServices: [],
     challenge: null,
     unsignedPresentation: false,
   };

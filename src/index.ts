@@ -45,5 +45,8 @@ export {
   defaultDocumentLoader,
   defaultFetchJson,
   defaultCryptoSuites,
+  defaultCryptoServices,
 } from './defaults.js';
+export { DataIntegrityCryptoService } from './services/data-integrity-crypto.js';
+export type { DataIntegrityCryptoConfig } from './services/data-integrity-crypto.js';
 export { extractCredentialsFrom } from './extractCredentialsFrom.js';

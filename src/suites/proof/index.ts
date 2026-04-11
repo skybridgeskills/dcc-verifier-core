@@ -4,14 +4,13 @@ import { signatureCheck } from './signature-check.js';
 /**
  * Proof verification suite.
  *
- * Cryptographic signature verification using the DCC vc library.
- * Handles both credential signatures and presentation signatures
- * with appropriate proof purpose selection.
+ * Dispatches to {@link VerificationContext.cryptoServices} — the first service whose
+ * `canVerify(subject)` is true runs verification. The default stack is built in
+ * `defaults.ts` as `[DataIntegrityCryptoService({ suites: cryptoSuites })]`.
  *
- * The signature check:
- * - Verifies cryptographic signatures using configured crypto suites
- * - Handles AuthenticationProofPurpose vs AssertionProofPurpose for presentations
- * - Classifies errors: HTTP errors, did:web resolution failures, JSON-LD errors, invalid signatures
+ * The Data Integrity adapter wraps `@digitalcredentials/vc`, handles
+ * AuthenticationProofPurpose vs AssertionProofPurpose for presentations, and maps
+ * library errors to `ProblemDetail` entries.
  */
 export const proofSuite: VerificationSuite = {
   id: 'proof',
