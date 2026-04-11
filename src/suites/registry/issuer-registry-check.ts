@@ -1,37 +1,8 @@
-import { RegistryClient, LookupResult, IssuerMatch, Registry } from '@digitalcredentials/issuer-registry-client';
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
-import type { EntityIdentityRegistry } from '../../types/registry.js';
-
-const registryClient = new RegistryClient();
-
-/**
- * Registry lookup result with details for the check outcome.
- */
-interface RegistryCheckResult {
-  found: boolean;
-  matchingRegistries: string[];
-  uncheckedRegistries: string[];
-}
-
-/**
- * Look up the issuer in known DID registries.
- */
-async function lookupIssuerInRegistries(
-  issuerDid: string,
-  registries: EntityIdentityRegistry[]
-): Promise<RegistryCheckResult> {
-  await registryClient.use({ registries });
-  const result: LookupResult = await registryClient.lookupIssuersFor(issuerDid);
-
-  return {
-    found: result.matchingIssuers.length > 0,
-    matchingRegistries: result.matchingIssuers.map((match: IssuerMatch) => match.registry.name),
-    uncheckedRegistries: result.uncheckedRegistries.map((reg: Registry) => reg.name),
-  };
-}
+import { defaultLookupIssuers } from '../../services/registry-lookup.js';
 
 /**
  * Extract issuer DID from credential.
@@ -55,6 +26,9 @@ function getIssuerDid(credential: Record<string, unknown>): string | undefined {
  *
  * Looks up the credential's issuer DID in known DID registries to determine
  * if the issuer is trusted/registered. This is a non-fatal informational check.
+ *
+ * Uses {@link VerificationContext.lookupIssuers} when set; otherwise
+ * {@link defaultLookupIssuers}.
  *
  * Skipped when:
  * - No registries provided in VerificationContext
@@ -105,8 +79,10 @@ export const issuerRegistryCheck: VerificationCheck = {
       };
     }
 
+    const lookupIssuers = context.lookupIssuers ?? defaultLookupIssuers;
+
     try {
-      const result = await lookupIssuerInRegistries(issuerDid, context.registries);
+      const result = await lookupIssuers(issuerDid, context.registries);
 
       if (result.found) {
         const message = result.matchingRegistries.length === 1

@@ -13,6 +13,7 @@ import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
 import { DataIntegrityCryptoService } from './services/data-integrity-crypto.js';
+import { defaultLookupIssuers } from './services/registry-lookup.js';
 import { CryptoSuite } from './types/crypto-suite.js';
 import { VerificationContext, FetchJson } from './types/context.js';
 import { VerificationSuite } from './types/check.js';
@@ -93,6 +94,8 @@ export const defaultSuites: VerificationSuite[] = [
  * const ctx = buildContext({ registries: myRegistries });
  * ```
  */
+export { defaultLookupIssuers };
+
 export function buildContext(overrides?: Partial<VerificationContext>): VerificationContext {
   const cryptoSuites = overrides?.cryptoSuites ?? defaultCryptoSuites;
   const cryptoServices =
@@ -104,7 +107,7 @@ export function buildContext(overrides?: Partial<VerificationContext>): Verifica
     cryptoSuites,
     cryptoServices,
     registries: overrides?.registries,
-    lookupIssuers: overrides?.lookupIssuers,
+    lookupIssuers: overrides?.lookupIssuers ?? defaultLookupIssuers,
     challenge: overrides?.challenge ?? null,
     unsignedPresentation: overrides?.unsignedPresentation ?? false,
   };

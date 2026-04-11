@@ -18,23 +18,15 @@ const OBV3_SCHEMA_V2_ENDORSEMENT = 'https://purl.imsglobal.org/spec/ob/v3p0/sche
 const VC_V2_CONTEXT = 'https://www.w3.org/ns/credentials/v2';
 const VC_V1_CONTEXT = 'https://www.w3.org/2018/credentials/v1';
 
-// AJV instance with schema loading
-const ajv = new Ajv2019({ allErrors: true, loadSchema });
-addFormats.default(ajv);
-
 /**
- * Load schema from URL.
+ * Validate credential against a schema URL using a per-run AJV instance (bound to
+ * {@link VerificationContext.fetchJson}).
  */
-async function loadSchema(url: string): Promise<object> {
-  const response = await fetch(url);
-  const data = await response.json();
-  return data;
-}
-
-/**
- * Validate credential against a schema URL.
- */
-async function validateAgainstSchema(schemaUrl: string, credential: Record<string, unknown>): Promise<{ valid: boolean; errors?: Array<{ message: string; instancePath: string }> }> {
+async function validateAgainstSchema(
+  ajv: Ajv2019,
+  schemaUrl: string,
+  credential: Record<string, unknown>
+): Promise<{ valid: boolean; errors?: Array<{ message: string; instancePath: string }> }> {
   const validate = ajv.getSchema(schemaUrl) || await ajv.compileAsync({ $ref: schemaUrl });
   const valid = validate(credential) as boolean;
   const errors = validate.errors?.map(e => ({
@@ -99,16 +91,16 @@ function selectObv3Schema(credential: Record<string, unknown>): { schema: string
 
   // If credentialSchema is specified, use those URLs directly
   if (credentialSchema) {
-      const schemas = Array.isArray(credentialSchema) ? credentialSchema : [credentialSchema];
-      if (schemas.length > 0 && schemas[0]?.id) {
-        return {
-          schema: schemas[0].id,
-          obType: '',
-          source: 'Schema was listed in the credentialSchema property of the VC',
-        };
-      }
+    const schemas = Array.isArray(credentialSchema) ? credentialSchema : [credentialSchema];
+    if (schemas.length > 0 && schemas[0]?.id) {
+      return {
+        schema: schemas[0].id,
+        obType: '',
+        source: 'Schema was listed in the credentialSchema property of the VC',
+      };
     }
-    // fall through - no valid credentialSchema found
+  }
+  // fall through - no valid credentialSchema found
 
   // No credentialSchema specified, try to infer from context and type
   if (!isObv3Credential(credential)) {
@@ -160,7 +152,7 @@ export const obv3SchemaCheck: VerificationCheck = {
   appliesTo: ['verifiableCredential'],
   execute: async (
     subject: VerificationSubject,
-    _context: VerificationContext
+    context: VerificationContext
   ): Promise<CheckOutcome> => {
     const credential = subject.verifiableCredential as Record<string, unknown> | undefined;
 
@@ -182,7 +174,18 @@ export const obv3SchemaCheck: VerificationCheck = {
     }
 
     try {
-      const result = await validateAgainstSchema(schemaInfo.schema, credential);
+      const loadSchema = async (url: string): Promise<object> => {
+        const doc = await context.fetchJson(url);
+        if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) {
+          throw new Error(`Expected JSON object schema at ${url}`);
+        }
+        return doc;
+      };
+
+      const ajv = new Ajv2019({ allErrors: true, loadSchema });
+      addFormats.default(ajv);
+
+      const result = await validateAgainstSchema(ajv, schemaInfo.schema, credential);
 
       if (result.valid) {
         return {

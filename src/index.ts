@@ -44,6 +44,7 @@ export {
   defaultSuites,
   defaultDocumentLoader,
   defaultFetchJson,
+  defaultLookupIssuers,
   defaultCryptoSuites,
   defaultCryptoServices,
 } from './defaults.js';
