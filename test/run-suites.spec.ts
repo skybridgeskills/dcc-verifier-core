@@ -10,7 +10,6 @@ describe('runSuites', () => {
   const mockContext: VerificationContext = {
     documentLoader: async () => ({}),
     cryptoSuites: [],
-    registries: {},
     challenge: null,
     unsignedPresentation: false,
   };

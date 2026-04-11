@@ -7,6 +7,7 @@
 export { verifyCredential, verifyPresentation } from './verify-suite.js';
 export type { CredentialVerificationResult, PresentationVerificationResult } from './types/result.js';
 export type { VerifyCredentialOptions, VerifyPresentationOptions } from './types/options.js';
+export type { EntityIdentityRegistry } from './types/registry.js';
 
 // ==================== Core Types ====================
 

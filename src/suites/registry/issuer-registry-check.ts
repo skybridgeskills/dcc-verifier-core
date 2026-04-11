@@ -3,6 +3,7 @@ import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import type { EntityIdentityRegistry } from '../../types/registry.js';
 
 const registryClient = new RegistryClient();
 
@@ -20,7 +21,7 @@ interface RegistryCheckResult {
  */
 async function lookupIssuerInRegistries(
   issuerDid: string,
-  registries: object
+  registries: EntityIdentityRegistry[]
 ): Promise<RegistryCheckResult> {
   await registryClient.use({ registries });
   const result: LookupResult = await registryClient.lookupIssuersFor(issuerDid);

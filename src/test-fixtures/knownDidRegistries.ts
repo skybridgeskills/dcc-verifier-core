@@ -1,8 +1,11 @@
-export const knownDIDRegistries: object = [
+import type { EntityIdentityRegistry } from '../types/registry.js';
+
+export const knownDIDRegistries: EntityIdentityRegistry[] = [
   {
-    "name": "Test DCC Member Registry",
-    "type": "oidf",
-    "trustAnchorEC": "https://test.registry.dcconsortium.org/.well-known/openid-federation"
+    name: 'Test DCC Member Registry',
+    type: 'oidf',
+    trustAnchorEC:
+      'https://test.registry.dcconsortium.org/.well-known/openid-federation',
   },
   {
     name: 'DCC Pilot Registry',
