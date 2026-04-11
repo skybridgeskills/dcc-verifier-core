@@ -1,2 +1,10 @@
-// Service factories (FakeCryptoService, etc.) — phase 5.
-export {};
+export {
+  FakeCryptoService,
+  hasDataIntegrityProof,
+} from './fake-crypto-service.js';
+export type { FakeCryptoServiceOptions } from './fake-crypto-service.js';
+export { FakeDocumentLoader } from './fake-document-loader.js';
+export type { FakeDocumentLoaderOptions } from './fake-document-loader.js';
+export { FakeFetchJson } from './fake-fetch-json.js';
+export { FakeRegistryLookup } from './fake-registry-lookup.js';
+export type { FakeRegistryLookupOptions } from './fake-registry-lookup.js';
