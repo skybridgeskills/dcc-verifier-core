@@ -1,36 +1,58 @@
+/**
+ * Verification result types.
+ *
+ * This module exports two sets of types:
+ *
+ * **Current** — `CredentialVerificationResult` and `PresentationVerificationResult`.
+ * These use the suite-based `CheckResult[]` model and are what `verifyCredential`
+ * and `verifyPresentation` actually return.
+ *
+ * **Legacy** — `VerificationResponse`, `PresentationVerificationResponse`, etc.
+ * These use the older `log[]` / `errors[]` shape and are still exported for
+ * backward compatibility with downstream consumers that haven't migrated.
+ * They are not produced by the current verification functions.
+ */
+
 import { CheckResult } from './check.js';
 import { VerifiableCredential } from '../schemas/credential.js';
 
-// ==================== New Suite-Based Architecture Types ====================
+// ==================== Current Suite-Based Result Types ====================
 
 /**
- * Result of credential verification using the new suite-based architecture.
+ * Result of credential verification.
+ *
+ * `verified` is derived from the check results: true when no check has a
+ * `failure` outcome. Skipped checks don't affect `verified`.
  */
 export interface CredentialVerificationResult {
-  /** Overall verification status - true if no failures */
+  /** True if no check returned a failure outcome. */
   verified: boolean;
 
-  /** The parsed credential that was verified */
+  /** The Zod-parsed credential that was verified. */
   credential: VerifiableCredential;
 
-  /** Individual check results from all suites */
+  /** Flat array of results from all suites — every check that ran or was skipped. */
   results: CheckResult[];
 }
 
 /**
- * Result of presentation verification using the new suite-based architecture.
+ * Result of presentation verification.
+ *
+ * Combines presentation-level checks (VP signature) with per-credential
+ * results. `verified` is true only if both the presentation and all
+ * embedded credentials passed.
  */
 export interface PresentationVerificationResult {
-  /** Overall verification status - true if no failures in presentation or credentials */
+  /** True if no failures in presentation checks or any credential checks. */
   verified: boolean;
 
-  /** Check results from presentation-level verification */
+  /** Check results from presentation-level verification (VP signature). */
   presentationResults: CheckResult[];
 
-  /** Individual credential verification results */
+  /** Individual credential verification results, one per embedded VC. */
   credentialResults: CredentialVerificationResult[];
 
-  /** All results flattened (presentation + all credential checks) */
+  /** All results flattened (presentation + all credential checks). */
   allResults: CheckResult[];
 }
 

@@ -1,3 +1,15 @@
+/**
+ * Primary public API — `verifyCredential` and `verifyPresentation`.
+ *
+ * These are the entry points that callers import from the package.
+ * Each function follows the same pipeline: parse → build context →
+ * run suites → assemble report.
+ *
+ * For credentials: runs all default suites plus any `additionalSuites`.
+ * For presentations: verifies the VP signature, then extracts and verifies
+ * each embedded credential individually.
+ */
+
 import { parseCredential, VerifiableCredential } from './schemas/credential.js';
 import { parsePresentation } from './schemas/presentation.js';
 import { runSuites } from './run-suites.js';

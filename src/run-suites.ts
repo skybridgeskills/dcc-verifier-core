@@ -1,3 +1,14 @@
+/**
+ * Suite orchestration engine.
+ *
+ * `runSuites` is the core loop of the verification pipeline: it iterates
+ * suites in order, runs each check, respects `appliesTo` filtering and
+ * `fatal` short-circuiting, and returns a flat `CheckResult[]` report.
+ *
+ * This module is pure orchestration — it has no knowledge of what any
+ * check actually does.
+ */
+
 import { VerificationSuite, VerificationCheck, CheckResult, CheckOutcome } from './types/check.js';
 import { VerificationContext } from './types/context.js';
 import { VerificationSubject } from './types/subject.js';
