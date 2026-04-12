@@ -227,7 +227,12 @@ describe('verifyCredential', () => {
       for (const checkResult of result.results) {
         expect(checkResult.suite).to.be.a('string');
         expect(checkResult.check).to.be.a('string');
-        expect(['success', 'failure', 'skipped']).to.include(checkResult.outcome.status);
+        const st = checkResult.outcome.status;
+        if (st !== 'success' && st !== 'failure' && st !== 'skipped') {
+          throw new Error(
+            `Unexpected outcome status for ${checkResult.suite}/${checkResult.check}: ${String(st)}`,
+          );
+        }
       }
     });
 

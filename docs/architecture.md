@@ -44,21 +44,14 @@ src/
 │   ├── subject.ts            VerificationSubject
 │   ├── problem-detail.ts     ProblemDetail (RFC 9457-inspired)
 │   └── registry.ts           EntityIdentityRegistry (OIDF + DCC legacy)
-└── test-fixtures/            VC/VP fixtures for tests
-    ├── vc.ts                 Factory-style getters (getVCv1, getVCv2Tampered, etc.)
-    ├── expectedResults.ts    Expected shapes (legacy format)
-    ├── knownDidRegistries.ts Registry config samples
-    └── verifiableCredentials/
-        ├── v1/               V1 credential fixtures
-        ├── v2/               V2 credential fixtures (+ did:web variants)
-        ├── eddsa/v2/         EdDSA-signed fixtures
-        └── eddsaAndEd25519/  Dual-signature fixtures
 ```
 
 ```
 test/
+├── fixtures/                   Golden VC objects for smoke / select integration tests (inline)
 ├── verify-credential.spec.ts   End-to-end credential verification
 ├── verify-presentation.spec.ts End-to-end presentation verification
+├── smoke.spec.ts               Networked interop regression (npm run test:smoke)
 ├── run-suites.spec.ts           Suite orchestration tests
 ├── types.spec.ts                Type validation tests
 ├── schemas.spec.ts              Zod schema tests
@@ -254,10 +247,9 @@ Run with `npm test` (lint + coverage via c8). Browser tests available via `npm r
 `verify-presentation.spec.ts`). Suite-focused specs in `test/suites/` test individual checks
 in isolation.
 
-**Fixtures.** `src/test-fixtures/` contains factory-style getters that return cloned VC objects.
-Variants cover: v1/v2, valid/tampered/expired/revoked, Ed25519/EdDSA, did:key/did:web, with and
-without status. Tests currently use real crypto with pre-signed fixtures rather than injected
-mock crypto.
+**Fixtures.** `test/fixtures/` holds curated golden credentials for `smoke.spec.ts` and a few
+integration cases. Suite tests use composable factories under `test/factories/` with fake crypto
+and loaders so the default unit run stays offline.
 
 ## Architectural direction
 
