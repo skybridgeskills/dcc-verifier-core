@@ -27,7 +27,8 @@ async function validateAgainstSchema(
   schemaUrl: string,
   credential: Record<string, unknown>
 ): Promise<{ valid: boolean; errors?: Array<{ message: string; instancePath: string }> }> {
-  const validate = ajv.getSchema(schemaUrl) || await ajv.compileAsync({ $ref: schemaUrl });
+  const validate =
+    ajv.getSchema(schemaUrl) || (await ajv.compileAsync({ $ref: schemaUrl }));
   const valid = validate(credential) as boolean;
   const errors = validate.errors?.map(e => ({
     message: e.message || 'Validation error',

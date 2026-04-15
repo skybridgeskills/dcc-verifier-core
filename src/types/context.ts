@@ -10,8 +10,10 @@
  * dependencies directly — it reads them from the context.
  */
 
+import type { CacheStore } from './cache.js';
 import type { CryptoService } from './crypto-service.js';
 import type { CryptoSuite } from './crypto-suite.js';
+import type { HttpGet } from './http.js';
 import type { EntityIdentityRegistry, LookupIssuers } from './registry.js';
 
 /**
@@ -42,6 +44,15 @@ export type FetchJson = (url: string) => Promise<unknown>;
 export interface VerificationContext {
   documentLoader: DocumentLoader;
   fetchJson: FetchJson;
+  /**
+   * Optional unified HTTP GET (e.g. cached). When set without explicit
+   * {@link documentLoader} / {@link fetchJson}, those are derived from this.
+   */
+  httpGet?: HttpGet;
+  /**
+   * Optional cache for domain-level storage (registry handlers, etc.).
+   */
+  cache?: CacheStore;
   /**
    * Linked Data Proof / Data Integrity suite instances for `@digitalcredentials/vc`.
    *

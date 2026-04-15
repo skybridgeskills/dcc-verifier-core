@@ -88,6 +88,8 @@ export async function verifyCredential(
   const context = buildContext({
     documentLoader: opts.documentLoader,
     fetchJson: opts.fetchJson,
+    httpGet: opts.httpGet,
+    cache: opts.cache,
     cryptoSuites: opts.cryptoSuites,
     cryptoServices: opts.cryptoServices,
     lookupIssuers: opts.lookupIssuers,
@@ -96,7 +98,9 @@ export async function verifyCredential(
 
   // Step 3: Collect suites
   const suites: VerificationSuite[] = [
-    ...defaultSuites,
+    ...(opts.verifyObv3Schema === false
+      ? defaultSuites.filter(s => s.id !== 'schema.obv3')
+      : defaultSuites),
     ...(opts.additionalSuites ?? []),
   ];
 
@@ -161,6 +165,8 @@ export async function verifyPresentation(
   const context = buildContext({
     documentLoader: opts.documentLoader,
     fetchJson: opts.fetchJson,
+    httpGet: opts.httpGet,
+    cache: opts.cache,
     cryptoSuites: opts.cryptoSuites,
     cryptoServices: opts.cryptoServices,
     lookupIssuers: opts.lookupIssuers,
@@ -198,8 +204,11 @@ export async function verifyPresentation(
         credential,
         registries,
         additionalSuites: opts.additionalSuites,
+        verifyObv3Schema: opts.verifyObv3Schema,
         documentLoader: opts.documentLoader,
         fetchJson: opts.fetchJson,
+        httpGet: opts.httpGet,
+        cache: opts.cache,
         cryptoSuites: opts.cryptoSuites,
         cryptoServices: opts.cryptoServices,
         lookupIssuers: opts.lookupIssuers,
