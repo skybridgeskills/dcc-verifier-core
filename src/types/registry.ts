@@ -3,14 +3,16 @@
  *
  * Registries are lists of trusted issuer DIDs. During verification, the
  * registry suite checks whether the credential's issuer appears in any
- * configured registry. Two registry types are supported.
+ * configured registry. Three registry types are supported.
  *
- * Shape matches `@digitalcredentials/issuer-registry-client`.
+ * Shape matches `@digitalcredentials/issuer-registry-client` for `oidf`
+ * and `dcc-legacy`; `vc-recognition` follows the W3C VCs for Entity
+ * Recognition draft (https://w3c.github.io/vc-recognition/).
  */
 
 export interface BaseEntityIdentityRegistry {
   name: string;
-  type: 'oidf' | 'dcc-legacy';
+  type: 'oidf' | 'dcc-legacy' | 'vc-recognition';
 }
 
 /**
@@ -31,10 +33,31 @@ export interface DccLegacyEntityIdentityRegistry extends BaseEntityIdentityRegis
   url: string;
 }
 
+/**
+ * VC Recognition registry — a URL pointing to a VerifiableRecognitionCredential
+ * whose `credentialSubject` lists recognized entities (by DID).
+ *
+ * The credential is fetched, verified (proof + issuer match against
+ * `acceptedIssuers`), and cached until its `validUntil` datetime.
+ *
+ * @see https://w3c.github.io/vc-recognition/
+ */
+export interface VcRecognitionEntityIdentityRegistry extends BaseEntityIdentityRegistry {
+  type: 'vc-recognition';
+  /** URL from which the VerifiableRecognitionCredential is fetched. */
+  url: string;
+  /**
+   * Issuer DIDs/URLs trusted to issue this recognition credential.
+   * Matched against `credential.issuer` (string) or `credential.issuer.id` (object).
+   */
+  acceptedIssuers: string[];
+}
+
 /** Discriminated union of supported registry types. */
 export type EntityIdentityRegistry =
   | OidfEntityIdentityRegistry
-  | DccLegacyEntityIdentityRegistry;
+  | DccLegacyEntityIdentityRegistry
+  | VcRecognitionEntityIdentityRegistry;
 
 /**
  * Normalized result of an issuer registry lookup (port output for `lookupIssuers`).

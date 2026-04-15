@@ -9,6 +9,9 @@ export type { CredentialVerificationResult, PresentationVerificationResult } fro
 export type { VerifyCredentialOptions, VerifyPresentationOptions } from './types/options.js';
 export type {
   EntityIdentityRegistry,
+  OidfEntityIdentityRegistry,
+  DccLegacyEntityIdentityRegistry,
+  VcRecognitionEntityIdentityRegistry,
   RegistryLookupResult,
   LookupIssuers,
 } from './types/registry.js';
