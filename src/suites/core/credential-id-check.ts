@@ -1,6 +1,7 @@
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import { ProblemTypes } from '../../problem-types.js';
 
 /**
  * Check that credential.id, if present, is a valid URL.
@@ -22,7 +23,7 @@ export const credentialIdCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#INVALID_CREDENTIAL_ID',
+          type: ProblemTypes.INVALID_CREDENTIAL_ID,
           title: 'Invalid Credential ID',
           detail: 'No verifiable credential found in subject.',
         }],
@@ -44,7 +45,7 @@ export const credentialIdCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#INVALID_CREDENTIAL_ID',
+          type: ProblemTypes.INVALID_CREDENTIAL_ID,
           title: 'Invalid Credential ID',
           detail: 'Credential ID must be a string URL.',
         }],
@@ -58,7 +59,7 @@ export const credentialIdCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#INVALID_CREDENTIAL_ID',
+          type: ProblemTypes.INVALID_CREDENTIAL_ID,
           title: 'Invalid Credential ID',
           detail: `Credential ID is not a valid URL: ${id}`,
         }],

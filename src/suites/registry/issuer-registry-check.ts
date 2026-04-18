@@ -2,6 +2,7 @@ import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import { ProblemTypes } from '../../problem-types.js';
 
 /**
  * Extract issuer DID from credential.
@@ -73,7 +74,7 @@ export const issuerRegistryCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#ISSUER_NOT_FOUND',
+          type: ProblemTypes.ISSUER_NOT_FOUND,
           title: 'Issuer Not Found',
           detail: 'Credential has no issuer or issuer ID is missing.',
         }],
@@ -109,7 +110,7 @@ export const issuerRegistryCheck: VerificationCheck = {
 
       // Issuer not found
       const problems: ProblemDetail[] = [{
-        type: 'https://www.w3.org/TR/vc-data-model#ISSUER_NOT_REGISTERED',
+        type: ProblemTypes.ISSUER_NOT_REGISTERED,
         title: 'Issuer Not Registered',
         detail: `Issuer ${issuerDid} was not found in any known DID registry.`,
       }];
@@ -117,7 +118,7 @@ export const issuerRegistryCheck: VerificationCheck = {
       // Add warning about unchecked registries
       if (result.uncheckedRegistries.length > 0) {
         problems.push({
-          type: 'https://www.w3.org/TR/vc-data-model#REGISTRY_UNCHECKED',
+          type: ProblemTypes.REGISTRY_UNCHECKED,
           title: 'Registry Unchecked',
           detail: `${result.uncheckedRegistries.length} registries could not be checked: ${result.uncheckedRegistries.join(', ')}`,
         });
@@ -132,7 +133,7 @@ export const issuerRegistryCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#REGISTRY_ERROR',
+          type: ProblemTypes.REGISTRY_ERROR,
           title: 'Registry Lookup Error',
           detail: error instanceof Error ? error.message : 'An error occurred while looking up issuer in registries.',
         }],

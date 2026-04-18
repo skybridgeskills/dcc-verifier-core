@@ -2,9 +2,10 @@ import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import { ProblemTypes } from '../../problem-types.js';
 
 const NO_APPLICABLE_SERVICE: ProblemDetail = {
-  type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+  type: ProblemTypes.PROOF_VERIFICATION_ERROR,
   title: 'No Applicable Crypto Service',
   detail: 'No registered crypto service can verify this subject (check canVerify / cryptoServices).',
 };
@@ -29,7 +30,7 @@ export const signatureCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+          type: ProblemTypes.PROOF_VERIFICATION_ERROR,
           title: 'No Verifiable Content',
           detail: 'No verifiable credential or presentation found in subject.',
         }],
@@ -61,7 +62,7 @@ export const signatureCheck: VerificationCheck = {
           return {
             status: 'failure',
             problems: [{
-              type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+              type: ProblemTypes.PROOF_VERIFICATION_ERROR,
               title: 'No Verifiable Content',
               detail: 'No verifiable credential or presentation found in subject.',
             }],
@@ -73,7 +74,7 @@ export const signatureCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+          type: ProblemTypes.PROOF_VERIFICATION_ERROR,
           title: 'Verification Error',
           detail: e instanceof Error ? e.message : 'An unexpected error occurred during signature verification.',
         }],

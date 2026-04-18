@@ -10,6 +10,7 @@ import type { CryptoResult, CryptoService, CryptoVerifyOptions } from '../types/
 import type { CryptoSuite, ProofPurpose } from '../types/crypto-suite.js';
 import type { ProblemDetail } from '../types/problem-detail.js';
 import type { VerificationSubject } from '../types/subject.js';
+import { ProblemTypes } from '../problem-types.js';
 
 const { purposes } = jsonLdSignatures;
 
@@ -63,7 +64,7 @@ function classifySignatureError(
     return errors.map((e: unknown) => {
       const x = e as { message?: string };
       return {
-        type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+        type: ProblemTypes.PARSING_ERROR,
         title: 'JSON-LD Validation Error',
         detail: x.message || 'Invalid JSON-LD document',
       };
@@ -86,7 +87,7 @@ function classifySignatureError(
         const didUrlPattern = didWebToUrlPattern(issuerDid);
         if (requestUrl.toLowerCase().includes(didUrlPattern)) {
           return [{
-            type: 'https://www.w3.org/TR/vc-data-model#DID_WEB_UNRESOLVED',
+            type: ProblemTypes.DID_WEB_UNRESOLVED,
             title: 'DID Web Unresolved',
             detail: `The signature could not be checked because the public signing key could not be retrieved from ${String(requestUrl)}`,
           }];
@@ -95,7 +96,7 @@ function classifySignatureError(
     }
 
     return [{
-      type: 'https://www.w3.org/TR/vc-data-model#HTTP_ERROR',
+      type: ProblemTypes.HTTP_ERROR,
       title: 'HTTP Error',
       detail: httpError?.message || 'An HTTP error prevented the signature check.',
     }];
@@ -103,7 +104,7 @@ function classifySignatureError(
 
   const err = error as { message?: string } | undefined;
   return [{
-    type: 'https://www.w3.org/TR/vc-data-model#INVALID_SIGNATURE',
+    type: ProblemTypes.INVALID_SIGNATURE,
     title: 'Invalid Signature',
     detail: err?.message || 'The signature is not valid.',
   }];
@@ -203,7 +204,7 @@ export function DataIntegrityCryptoService(config: DataIntegrityCryptoConfig): C
         return {
           verified: false,
           problems: [{
-            type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+            type: ProblemTypes.PROOF_VERIFICATION_ERROR,
             title: 'Verification Error',
             detail: e instanceof Error ? e.message : 'An unexpected error occurred during signature verification.',
           }],
@@ -258,7 +259,7 @@ export function DataIntegrityCryptoService(config: DataIntegrityCryptoConfig): C
         return {
           verified: false,
           problems: [{
-            type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+            type: ProblemTypes.PROOF_VERIFICATION_ERROR,
             title: 'Verification Error',
             detail: e instanceof Error ? e.message : 'An unexpected error occurred during signature verification.',
           }],

@@ -3,6 +3,7 @@ import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import { ProblemTypes } from '../../problem-types.js';
 
 // Legacy status types that are skipped
 const LEGACY_STATUS_TYPES: string[] = ['StatusList2021Entry', '1EdTechRevocationList'];
@@ -76,7 +77,7 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
   // Not found error
   if (err?.name === NOT_FOUND_ERROR || causeMessage.startsWith(NOT_FOUND_ERROR)) {
     return [{
-      type: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_NOT_FOUND',
+      type: ProblemTypes.STATUS_LIST_NOT_FOUND,
       title: 'Status List Not Found',
       detail: errorMessage,
     }];
@@ -85,7 +86,7 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
   // Expired error
   if (causeMessage.includes(EXPIRED_ERROR) || errorMessage.includes(EXPIRED_ERROR.toLowerCase())) {
     return [{
-      type: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_EXPIRED',
+      type: ProblemTypes.STATUS_LIST_EXPIRED,
       title: 'Status List Expired',
       detail: 'The status list credential has expired.',
     }];
@@ -94,7 +95,7 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
   // Signature verification error
   if (causeMessage.startsWith(STATUS_SIGNATURE_ERROR)) {
     return [{
-      type: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_SIGNATURE_ERROR',
+      type: ProblemTypes.STATUS_LIST_SIGNATURE_ERROR,
       title: 'Status List Signature Error',
       detail: 'The status list credential signature could not be verified.',
     }];
@@ -103,7 +104,7 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
   // Type error
   if (causeMessage.startsWith(STATUS_TYPE_ERROR)) {
     return [{
-      type: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_TYPE_ERROR',
+      type: ProblemTypes.STATUS_LIST_TYPE_ERROR,
       title: 'Status List Type Error',
       detail: STATUS_TYPE_ERROR,
     }];
@@ -112,7 +113,7 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
   // Not yet valid error
   if (causeMessage.includes(STATUS_NOT_YET_VALID_ERROR)) {
     return [{
-      type: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_NOT_YET_VALID',
+      type: ProblemTypes.STATUS_LIST_NOT_YET_VALID,
       title: 'Status List Not Yet Valid',
       detail: 'The status list credential is not yet valid.',
     }];
@@ -120,7 +121,7 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
 
   // Generic status error
   return [{
-    type: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ERROR',
+    type: ProblemTypes.STATUS_LIST_ERROR,
     title: 'Status List Error',
     detail: errorMessage || 'An error occurred while checking credential status.',
   }];
@@ -211,7 +212,7 @@ export const bitstringStatusCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED',
+          type: ProblemTypes.CREDENTIAL_REVOKED_OR_SUSPENDED,
           title: 'Credential Revoked or Suspended',
           detail: 'The credential has been revoked or suspended according to the status list.',
         }],

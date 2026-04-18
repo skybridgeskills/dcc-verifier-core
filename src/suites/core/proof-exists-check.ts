@@ -1,6 +1,7 @@
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import { ProblemTypes } from '../../problem-types.js';
 
 /**
  * Check that a proof property exists on the credential.
@@ -22,7 +23,7 @@ export const proofExistsCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+          type: ProblemTypes.PROOF_VERIFICATION_ERROR,
           title: 'No Proof',
           detail: 'No verifiable credential found in subject.',
         }],
@@ -35,7 +36,7 @@ export const proofExistsCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+          type: ProblemTypes.PROOF_VERIFICATION_ERROR,
           title: 'No Proof',
           detail: 'Credential is missing required proof property.',
         }],
@@ -54,7 +55,7 @@ export const proofExistsCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PROOF_VERIFICATION_ERROR',
+          type: ProblemTypes.PROOF_VERIFICATION_ERROR,
           title: 'No Proof',
           detail: 'Credential proof property is invalid.',
         }],

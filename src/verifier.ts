@@ -50,6 +50,7 @@ import { createRegistryLookup } from './services/registry-lookup.js';
 import { fetchJsonFromHttpGet } from './util/fetch-json-from-http-get.js';
 import type { ProblemDetail } from './types/problem-detail.js';
 import type { EntityIdentityRegistry } from './types/registry.js';
+import { ProblemTypes } from './problem-types.js';
 
 export function createVerifier(config: VerifierConfig = {}): Verifier {
   const httpGetService = config.httpGetService ?? defaultHttpGetService();
@@ -225,7 +226,7 @@ function parseFailureCredentialResult(
   error: { errors: Array<{ path: Array<string | number>; message: string }> },
 ): CredentialVerificationResult {
   const problem: ProblemDetail = {
-    type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+    type: ProblemTypes.PARSING_ERROR,
     title: 'Credential Parsing Failed',
     detail: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
   };
@@ -241,7 +242,7 @@ function parseFailurePresentationResult(
   error: { errors: Array<{ path: Array<string | number>; message: string }> },
 ): PresentationVerificationResult {
   const problem: ProblemDetail = {
-    type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+    type: ProblemTypes.PARSING_ERROR,
     title: 'Presentation Parsing Failed',
     detail: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
   };

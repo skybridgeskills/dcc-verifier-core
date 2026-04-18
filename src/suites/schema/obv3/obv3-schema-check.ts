@@ -4,6 +4,7 @@ import { VerificationCheck, CheckOutcome } from '../../../types/check.js';
 import { ProblemDetail } from '../../../types/problem-detail.js';
 import { VerificationSubject } from '../../../types/subject.js';
 import { VerificationContext } from '../../../types/context.js';
+import { ProblemTypes } from '../../../problem-types.js';
 
 // OBv3 context matcher
 const OBV3_0_3_CONTEXT_MATCHER = 'https://purl.imsglobal.org/spec/ob/v3p0/context-3';
@@ -201,7 +202,7 @@ export const obv3SchemaCheck: VerificationCheck = {
       ).join('; ') || 'Unknown validation error';
 
       const problems: ProblemDetail[] = [{
-        type: 'https://www.w3.org/TR/vc-data-model#SCHEMA_VALIDATION_FAILED',
+        type: ProblemTypes.SCHEMA_VALIDATION_FAILED,
         title: 'Schema Validation Failed',
         detail: `Schema validation failed for ${schemaInfo.schema}: ${errorDetails}`,
       }];
@@ -215,7 +216,7 @@ export const obv3SchemaCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#SCHEMA_VALIDATION_ERROR',
+          type: ProblemTypes.SCHEMA_VALIDATION_ERROR,
           title: 'Schema Validation Error',
           detail: error instanceof Error ? error.message : 'An error occurred during schema validation.',
         }],

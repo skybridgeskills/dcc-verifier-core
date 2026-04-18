@@ -57,6 +57,8 @@ export { obv3SchemaSuite } from './suites/schema/index.js';
 
 // ==================== Extension points ====================
 
+export { ProblemTypes } from './problem-types.js';
+export type { ProblemType } from './problem-types.js';
 export type {
   RegistryHandlerContext,
   RegistryHandlerMap,

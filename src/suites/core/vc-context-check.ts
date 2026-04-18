@@ -1,6 +1,7 @@
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import { ProblemTypes } from '../../problem-types.js';
 
 const VC_CONTEXT_V1 = 'https://www.w3.org/2018/credentials/v1';
 const VC_CONTEXT_V2 = 'https://www.w3.org/ns/credentials/v2';
@@ -25,7 +26,7 @@ export const vcContextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+          type: ProblemTypes.PARSING_ERROR,
           title: 'No VC Context',
           detail: 'No verifiable credential found in subject.',
         }],
@@ -55,7 +56,7 @@ export const vcContextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+          type: ProblemTypes.PARSING_ERROR,
           title: 'No VC Context',
           detail: `Credential @context does not include required VC context URI (${VC_CONTEXT_V1} or ${VC_CONTEXT_V2}).`,
         }],

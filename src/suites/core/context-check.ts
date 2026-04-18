@@ -1,6 +1,7 @@
 import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
+import { ProblemTypes } from '../../problem-types.js';
 
 /**
  * Check that @context exists and is non-empty.
@@ -22,7 +23,7 @@ export const contextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+          type: ProblemTypes.PARSING_ERROR,
           title: 'Invalid JSON-LD',
           detail: 'No verifiable credential found in subject.',
         }],
@@ -35,7 +36,7 @@ export const contextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+          type: ProblemTypes.PARSING_ERROR,
           title: 'Invalid JSON-LD',
           detail: 'Credential is missing required @context property.',
         }],
@@ -50,7 +51,7 @@ export const contextCheck: VerificationCheck = {
       return {
         status: 'failure',
         problems: [{
-          type: 'https://www.w3.org/TR/vc-data-model#PARSING_ERROR',
+          type: ProblemTypes.PARSING_ERROR,
           title: 'Invalid JSON-LD',
           detail: 'Credential @context property is empty.',
         }],
