@@ -11,6 +11,7 @@
 - [API](#api)
   - [verifyCredential](#verifycredential)
   - [verifyPresentation](#verifypresentation)
+  - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
 - [Custom Suites](#custom-suites)
 - [Architecture](#architecture)
 - [Install](#install)
@@ -239,6 +240,32 @@ Presentation verification does two things:
 `verified` is `true` only if both the presentation and all embedded credentials pass. `allResults` flattens everything into a single array.
 
 A VP needn't be signed — it can simply package credentials together. Set `unsignedPresentation: true` to skip the VP signature check.
+
+### createVerifier (batch / repeated verification)
+
+`verifyCredential` and `verifyPresentation` are convenient one-shot wrappers — each call builds a
+fresh verifier internally. When you'll perform more than one verification, construct a `Verifier`
+with `createVerifier(...)` and reuse it for better performance. The instance owns long-lived
+dependencies (HTTP, cache, crypto services, document loader, registries), so issuer DID documents,
+status list credentials, and JSON-LD contexts are fetched once and reused across calls. 
+
+```typescript
+import { createVerifier } from '@digitalcredentials/verifier-core';
+
+const verifier = createVerifier({ registries });
+
+for (const credential of batch) {
+  const result = await verifier.verifyCredential({ credential });
+  // ... handle result ...
+}
+```
+
+The same `Verifier` is also used recursively when verifying a presentation, so all credentials
+embedded in a VP share the verifier's caches automatically:
+
+```typescript
+const result = await verifier.verifyPresentation({ presentation });
+```
 
 ## Custom Suites
 

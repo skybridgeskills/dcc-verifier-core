@@ -9,15 +9,28 @@ export type FakeHttpGetServiceOptions = {
 /**
  * Test double: URL → fixed {@link HttpGetResult} (status 200 by default).
  * Throws if URL unmapped and no fallback.
+ *
+ * Records every `get(url)` invocation, exposed via `callsTo(url)` and
+ * `allCalls()`. The recording happens before the urlMap lookup or
+ * fallback dispatch, so the count reflects what the caller asked for —
+ * higher-layer cache hits that short-circuit before reaching this
+ * service are correctly observed as a count of zero.
  */
 export function FakeHttpGetService(
   urlMap: Record<string, HttpGetResult>,
   options: FakeHttpGetServiceOptions = {},
-): HttpGetService {
+): HttpGetService & {
+  /** Number of times `get(url)` was invoked for the given URL. */
+  callsTo: (url: string) => number;
+  /** All URLs requested, in order. */
+  allCalls: () => string[];
+} {
   const { fallback } = options;
+  const calls: string[] = [];
 
   return {
     async get(url: string): Promise<HttpGetResult> {
+      calls.push(url);
       if (Object.prototype.hasOwnProperty.call(urlMap, url)) {
         return urlMap[url];
       }
@@ -25,6 +38,12 @@ export function FakeHttpGetService(
         return fallback.get(url);
       }
       throw new Error(`No fake HttpGetService for URL: ${url}`);
+    },
+    callsTo(url: string): number {
+      return calls.filter(c => c === url).length;
+    },
+    allCalls(): string[] {
+      return [...calls];
     },
   };
 }
