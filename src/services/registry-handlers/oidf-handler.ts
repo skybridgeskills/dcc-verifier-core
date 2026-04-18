@@ -3,24 +3,23 @@ import type { CacheService } from '../cache-service/cache-service.js';
 import type { HttpGetService } from '../http-get-service/http-get-service.js';
 import { parseCacheControlMaxAge, resolveTtl } from './cache-ttl.js';
 import { jwtDecodePayload } from './jwt-payload-decode.js';
-import type { HandlerResult, RegistryHandler } from './types.js';
+import type { HandlerResult, RegistryHandler, RegistryHandlerContext } from './types.js';
 
 /**
  * OIDF trust-anchor lookup: entity configuration JWT, then federation fetch
  * for the issuer DID (JWT payload decode only; no signature verification).
  */
-export const lookupOidf: RegistryHandler = async (did, registry, httpGetService, cacheService) => {
+export const lookupOidf: RegistryHandler = async (did, registry, ctx) => {
   if (registry.type !== 'oidf') {
     return { status: 'unchecked', registryName: registry.name };
   }
-  return lookupOidfForRegistry(did, registry, httpGetService, cacheService);
+  return lookupOidfForRegistry(did, registry, ctx);
 };
 
 async function lookupOidfForRegistry(
   did: string,
   registry: OidfEntityIdentityRegistry,
-  httpGetService: HttpGetService,
-  cacheService: CacheService,
+  { httpGetService, cacheService }: RegistryHandlerContext,
 ): Promise<HandlerResult> {
   const ecJwt = await getOrLoadEntityConfigJwt(registry.trustAnchorEC, httpGetService, cacheService);
   if (!ecJwt) {

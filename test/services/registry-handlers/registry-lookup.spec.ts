@@ -1,9 +1,13 @@
 import { expect } from 'chai';
 import type { EntityIdentityRegistry } from '../../../src/types/registry.js';
 import { createRegistryLookup } from '../../../src/services/registry-lookup.js';
-import type { RegistryHandlerMap } from '../../../src/services/registry-handlers/types.js';
+import type {
+  RegistryHandler,
+  RegistryHandlerMap,
+} from '../../../src/services/registry-handlers/types.js';
 import { FakeCacheService } from '../../factories/services/fake-cache-service.js';
 import { FakeHttpGetService, okJsonBody } from '../../factories/services/fake-http-get-service.js';
+import { FakeVerifier } from '../../factories/services/fake-verifier.js';
 
 const dccRegistry: EntityIdentityRegistry = {
   name: 'Test Legacy',
@@ -298,6 +302,76 @@ describe('createRegistryLookup', () => {
       // Non-fresh should use cached result
       await lookup('did:key:test', [dccRegistry]);
       expect(handlerCallCount).to.equal(1);
+    });
+  });
+
+  describe('verifier threading', () => {
+    it('passes the provided verifier through to handler context', async () => {
+      const fakeVerifier = FakeVerifier();
+      let receivedVerifier: unknown;
+      const captureHandler: RegistryHandler = async (_did, registry, ctx) => {
+        receivedVerifier = ctx.verifier;
+        return { status: 'found', registryName: registry.name };
+      };
+      const handlers: RegistryHandlerMap = {
+        'dcc-legacy': captureHandler,
+        oidf: async () => ({ status: 'not-found' }),
+        'vc-recognition': async () => ({ status: 'not-found' }),
+      };
+      const lookup = createRegistryLookup(
+        FakeHttpGetService({}),
+        FakeCacheService(),
+        handlers,
+        fakeVerifier,
+      );
+      await lookup('did:key:test', [dccRegistry]);
+      expect(receivedVerifier).to.equal(fakeVerifier);
+    });
+
+    it('lets dcc-legacy / oidf handlers run when no verifier is provided', async () => {
+      // The handlers themselves don't touch ctx.verifier — only
+      // accessing it lazily should throw.
+      const handlers: RegistryHandlerMap = {
+        'dcc-legacy': async (_did, registry) => ({
+          status: 'found',
+          registryName: registry.name,
+        }),
+        oidf: async () => ({ status: 'not-found' }),
+        'vc-recognition': async () => ({ status: 'not-found' }),
+      };
+      const lookup = createRegistryLookup(
+        FakeHttpGetService({}),
+        FakeCacheService(),
+        handlers,
+        // no verifier
+      );
+      const result = await lookup('did:key:test', [dccRegistry]);
+      expect(result.found).to.equal(true);
+    });
+
+    it('throws a clear error when a handler accesses ctx.verifier without one bound', async () => {
+      const handlers: RegistryHandlerMap = {
+        'dcc-legacy': async (_did, _registry, ctx) => {
+          // Force access — vc-recognition does this in production.
+          void ctx.verifier;
+          return { status: 'not-found' };
+        },
+        oidf: async () => ({ status: 'not-found' }),
+        'vc-recognition': async () => ({ status: 'not-found' }),
+      };
+      const lookup = createRegistryLookup(
+        FakeHttpGetService({}),
+        FakeCacheService(),
+        handlers,
+      );
+      let caught: unknown;
+      try {
+        await lookup('did:key:test', [dccRegistry]);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).to.be.instanceOf(Error);
+      expect((caught as Error).message).to.match(/verifier/i);
     });
   });
 });

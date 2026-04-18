@@ -3,8 +3,20 @@ import type { EntityIdentityRegistry } from '../../../src/types/registry.js';
 import type { HttpGetService } from '../../../src/services/http-get-service/http-get-service.js';
 import { DEFAULT_TTL_MS } from '../../../src/services/registry-handlers/cache-ttl.js';
 import { lookupOidf } from '../../../src/services/registry-handlers/oidf-handler.js';
+import type {
+  RegistryHandlerContext,
+} from '../../../src/services/registry-handlers/types.js';
 import { FakeCacheService } from '../../factories/services/fake-cache-service.js';
-import { httpGetResult, okJsonBody } from '../../factories/services/fake-http-get-service.js';
+import { FakeHttpGetService, httpGetResult, okJsonBody } from '../../factories/services/fake-http-get-service.js';
+import { FakeVerifier } from '../../factories/services/fake-verifier.js';
+
+function buildCtx(overrides: Partial<RegistryHandlerContext> = {}): RegistryHandlerContext {
+  return {
+    httpGetService: overrides.httpGetService ?? FakeHttpGetService({}),
+    cacheService: overrides.cacheService ?? FakeCacheService(),
+    verifier: overrides.verifier ?? FakeVerifier(),
+  };
+}
 
 const ecUrl = 'https://ta.example/.well-known/openid-federation';
 const fetchEndpoint = 'https://op.example/federation-fetch';
@@ -68,8 +80,8 @@ describe('lookupOidf', () => {
       },
     };
     const cache = FakeCacheService();
-    await lookupOidf('did:key:abc', oidfRegistry, httpGetService, cache);
-    await lookupOidf('did:key:abc', oidfRegistry, httpGetService, cache);
+    await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService, cacheService: cache }));
+    await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService, cacheService: cache }));
     expect(ecCalls).to.equal(1);
   });
 
@@ -87,7 +99,7 @@ describe('lookupOidf', () => {
         throw new Error(`unexpected fetch: ${url}`);
       },
     };
-    const result = await lookupOidf('did:key:abc', oidfRegistry, httpGetService, FakeCacheService());
+    const result = await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService }));
     expect(result).to.deep.equal({ status: 'found', registryName: 'OIDF Test' });
   });
 
@@ -105,7 +117,7 @@ describe('lookupOidf', () => {
       },
     };
     const cache = FakeCacheService();
-    const result = await lookupOidf('did:key:missing', oidfRegistry, httpGetService, cache);
+    const result = await lookupOidf('did:key:missing', oidfRegistry, buildCtx({ httpGetService, cacheService: cache }));
     expect(result).to.deep.equal({ status: 'not-found' });
     expect(await cache.get(`oidf:lookup:${lookupUrl}`)).to.be.undefined;
   });
@@ -123,7 +135,7 @@ describe('lookupOidf', () => {
         throw new Error(`unexpected fetch: ${url}`);
       },
     };
-    const result = await lookupOidf('did:key:x', oidfRegistry, httpGetService, FakeCacheService());
+    const result = await lookupOidf('did:key:x', oidfRegistry, buildCtx({ httpGetService }));
     expect(result).to.deep.equal({ status: 'unchecked', registryName: 'OIDF Test' });
   });
 
@@ -133,7 +145,7 @@ describe('lookupOidf', () => {
         throw new Error('down');
       },
     };
-    const result = await lookupOidf('did:key:x', oidfRegistry, httpGetService, FakeCacheService());
+    const result = await lookupOidf('did:key:x', oidfRegistry, buildCtx({ httpGetService }));
     expect(result).to.deep.equal({ status: 'unchecked', registryName: 'OIDF Test' });
   });
 
@@ -156,7 +168,7 @@ describe('lookupOidf', () => {
       },
     };
     const { cache, sets } = cacheWithSetSpy();
-    await lookupOidf('did:key:abc', oidfRegistry, httpGetService, cache);
+    await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService, cacheService: cache }));
     const lookupSet = sets.find(
       s => typeof s.key === 'string' && s.key.startsWith('oidf:lookup:'),
     );
@@ -180,8 +192,8 @@ describe('lookupOidf', () => {
       },
     };
     const cache = FakeCacheService();
-    await lookupOidf('did:key:abc', oidfRegistry, httpGetService, cache);
-    await lookupOidf('did:key:abc', oidfRegistry, httpGetService, cache);
+    await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService, cacheService: cache }));
+    await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService, cacheService: cache }));
     expect(lookupCalls).to.equal(1);
   });
 
@@ -200,7 +212,7 @@ describe('lookupOidf', () => {
       },
     };
     const { cache, sets } = cacheWithSetSpy();
-    await lookupOidf('did:key:abc', oidfRegistry, httpGetService, cache);
+    await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService, cacheService: cache }));
     const ecSet = sets.find(
       s => typeof s.key === 'string' && s.key.startsWith('oidf:ec:'),
     );
@@ -220,7 +232,7 @@ describe('lookupOidf', () => {
         return okJsonBody({});
       },
     };
-    const result = await lookupOidf('did:key:x', dcc, httpGetService, FakeCacheService());
+    const result = await lookupOidf('did:key:x', dcc, buildCtx({ httpGetService }));
     expect(result).to.deep.equal({ status: 'unchecked', registryName: 'Legacy' });
     expect(calls).to.equal(0);
   });
@@ -239,7 +251,7 @@ describe('lookupOidf', () => {
         throw new Error(`unexpected fetch: ${url}`);
       },
     };
-    const result = await lookupOidf('did:key:abc', oidfRegistry, httpGetService, FakeCacheService());
+    const result = await lookupOidf('did:key:abc', oidfRegistry, buildCtx({ httpGetService }));
     expect(result).to.deep.equal({ status: 'unchecked', registryName: 'OIDF Test' });
   });
 });

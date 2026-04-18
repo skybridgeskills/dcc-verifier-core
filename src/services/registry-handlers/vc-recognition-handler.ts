@@ -1,41 +1,34 @@
-import type { VerifyCredentialOptions } from '../../types/options.js';
-import type { CredentialVerificationResult } from '../../types/result.js';
 import type { VcRecognitionEntityIdentityRegistry } from '../../types/registry.js';
-import type { CacheService } from '../cache-service/cache-service.js';
 import type { HttpGetService } from '../http-get-service/http-get-service.js';
 import { resolveTtl, ttlFromValidUntil } from './cache-ttl.js';
-import type { HandlerResult, RegistryHandler } from './types.js';
+import type { HandlerResult, RegistryHandler, RegistryHandlerContext } from './types.js';
 
 /**
- * Test seam: when set, {@link lookupVcRecognition} uses this instead of
- * `verifyCredential` (avoids crypto in unit tests).
- */
-export const vcRecognitionVerifyCredentialOverride: {
-  fn: ((opts: VerifyCredentialOptions) => Promise<CredentialVerificationResult>) | null;
-} = { fn: null };
-
-/**
- * VerifiableRecognitionCredential registry: fetch VC, verify issuer + proof,
- * cache until `validUntil`, then check `credentialSubject` for the DID.
+ * VerifiableRecognitionCredential registry: fetch the recognition VC,
+ * verify its issuer + proof using the parent {@link Verifier}
+ * (sharing the same cache + crypto stack), cache until `validUntil`,
+ * then check `credentialSubject` for `did`.
  *
- * Uses dynamic import of `verifyCredential` to avoid a circular module dependency with
- * `verify-suite` → `defaults` → registry wiring.
+ * The recursive call passes `registries: []` to skip the registry suite
+ * for the recognition credential itself — that prevents infinite
+ * recursion when the recognition VC's own issuer is also looked up
+ * through a recognition registry.
  *
  * @see https://w3c.github.io/vc-recognition/
  */
-export const lookupVcRecognition: RegistryHandler = async (did, registry, httpGetService, cacheService) => {
+export const lookupVcRecognition: RegistryHandler = async (did, registry, ctx) => {
   if (registry.type !== 'vc-recognition') {
     return { status: 'unchecked', registryName: registry.name };
   }
-  return lookupVcRecognitionForRegistry(did, registry, httpGetService, cacheService);
+  return lookupVcRecognitionForRegistry(did, registry, ctx);
 };
 
 async function lookupVcRecognitionForRegistry(
   did: string,
   registry: VcRecognitionEntityIdentityRegistry,
-  httpGetService: HttpGetService,
-  cacheService: CacheService,
+  ctx: RegistryHandlerContext,
 ): Promise<HandlerResult> {
+  const { httpGetService, cacheService, verifier } = ctx;
   const key = cacheKeyForVcRecognitionUrl(registry.url);
   let credential = (await cacheService.get(key)) as Record<string, unknown> | undefined;
 
@@ -50,13 +43,9 @@ async function lookupVcRecognitionForRegistry(
       return { status: 'unchecked', registryName: registry.name };
     }
 
-    const verify =
-      vcRecognitionVerifyCredentialOverride.fn ??
-      (await import('../../verify-suite.js')).verifyCredential;
-    const verification = await verify({
+    const verification = await verifier.verifyCredential({
       credential: loaded,
-      httpGetService,
-      cacheService,
+      registries: [],
     });
 
     if (!verification.verified) {

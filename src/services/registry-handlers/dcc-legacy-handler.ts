@@ -1,8 +1,7 @@
 import type { DccLegacyEntityIdentityRegistry } from '../../types/registry.js';
-import type { CacheService } from '../cache-service/cache-service.js';
 import type { HttpGetService } from '../http-get-service/http-get-service.js';
 import { parseCacheControlMaxAge, resolveTtl } from './cache-ttl.js';
-import type { HandlerResult, RegistryHandler } from './types.js';
+import type { HandlerResult, RegistryHandler, RegistryHandlerContext } from './types.js';
 
 /**
  * DCC legacy registry JSON: a map of DID → issuer metadata under `registry`.
@@ -17,18 +16,17 @@ export interface DccLegacyRegistryBody {
  * Fetch a DCC legacy registry JSON file, cache by URL, and resolve whether `did`
  * appears in `body.registry`.
  */
-export const lookupDccLegacy: RegistryHandler = async (did, registry, httpGetService, cacheService) => {
+export const lookupDccLegacy: RegistryHandler = async (did, registry, ctx) => {
   if (registry.type !== 'dcc-legacy') {
     return { status: 'unchecked', registryName: registry.name };
   }
-  return lookupDccLegacyForRegistry(did, registry, httpGetService, cacheService);
+  return lookupDccLegacyForRegistry(did, registry, ctx);
 };
 
 async function lookupDccLegacyForRegistry(
   did: string,
   registry: DccLegacyEntityIdentityRegistry,
-  httpGetService: HttpGetService,
-  cacheService: CacheService,
+  { httpGetService, cacheService }: RegistryHandlerContext,
 ): Promise<HandlerResult> {
   const key = cacheKeyForDccLegacyUrl(registry.url);
   let body = (await cacheService.get(key)) as DccLegacyRegistryBody | undefined;

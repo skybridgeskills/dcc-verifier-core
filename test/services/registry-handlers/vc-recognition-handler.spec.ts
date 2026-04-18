@@ -1,14 +1,18 @@
 import { expect } from 'chai';
 import type { EntityIdentityRegistry } from '../../../src/types/registry.js';
 import type { VerifiableCredential } from '../../../src/schemas/credential.js';
-import type { VerifyCredentialOptions } from '../../../src/types/options.js';
-import type { CredentialVerificationResult } from '../../../src/types/result.js';
-import {
-  lookupVcRecognition,
-  vcRecognitionVerifyCredentialOverride,
-} from '../../../src/services/registry-handlers/vc-recognition-handler.js';
+import type { Verifier } from '../../../src/types/verifier.js';
+import type {
+  CredentialVerificationResult,
+  PresentationVerificationResult,
+} from '../../../src/types/result.js';
+import type {
+  RegistryHandlerContext,
+} from '../../../src/services/registry-handlers/types.js';
+import { lookupVcRecognition } from '../../../src/services/registry-handlers/vc-recognition-handler.js';
 import { FakeCacheService } from '../../factories/services/fake-cache-service.js';
 import { FakeHttpGetService, okJsonBody } from '../../factories/services/fake-http-get-service.js';
+import { FakeVerifier } from '../../factories/services/fake-verifier.js';
 
 const listUrl = 'https://example.com/recognition.json';
 
@@ -35,67 +39,59 @@ const registry: EntityIdentityRegistry = {
   acceptedIssuers: ['did:web:learning-commission.example'],
 };
 
-const stubCredential = {} as unknown as VerifiableCredential;
-
-const okVerify = async (
-  _opts: VerifyCredentialOptions,
-): Promise<CredentialVerificationResult> => ({
-  verified: true,
-  credential: stubCredential,
-  results: [],
-});
+function buildCtx(overrides: Partial<RegistryHandlerContext> = {}): RegistryHandlerContext {
+  return {
+    httpGetService: overrides.httpGetService ?? FakeHttpGetService({}),
+    cacheService: overrides.cacheService ?? FakeCacheService(),
+    verifier: overrides.verifier ?? FakeVerifier(),
+  };
+}
 
 describe('lookupVcRecognition', () => {
-  afterEach(() => {
-    vcRecognitionVerifyCredentialOverride.fn = null;
-  });
-
   it('returns found when DID appears in credentialSubject array', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = okVerify;
     const vc = buildVc();
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
-    const result = await lookupVcRecognition(
-      'did:web:university.example',
-      registry,
-      httpGetService,
-      FakeCacheService(),
-    );
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+    });
+    const result = await lookupVcRecognition('did:web:university.example', registry, ctx);
     expect(result).to.deep.equal({ status: 'found', registryName: 'Recognition List' });
   });
 
   it('returns found when credentialSubject is a single object', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = okVerify;
     const vc = buildVc({
       credentialSubject: {
         id: 'did:key:single',
         type: 'RecognizedEntity',
       },
     });
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
-    const result = await lookupVcRecognition('did:key:single', registry, httpGetService, FakeCacheService());
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+    });
+    const result = await lookupVcRecognition('did:key:single', registry, ctx);
     expect(result).to.deep.equal({ status: 'found', registryName: 'Recognition List' });
   });
 
   it('returns not-found when DID is absent', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = okVerify;
     const vc = buildVc();
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
-    const result = await lookupVcRecognition('did:key:missing', registry, httpGetService, FakeCacheService());
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+    });
+    const result = await lookupVcRecognition('did:key:missing', registry, ctx);
     expect(result).to.deep.equal({ status: 'not-found' });
   });
 
   it('returns unchecked when issuer is not in acceptedIssuers', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = async () => {
-      throw new Error('verifyCredential should not run');
-    };
     const vc = buildVc({ issuer: 'did:web:untrusted.example' });
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
-    const result = await lookupVcRecognition(
-      'did:web:university.example',
-      registry,
-      httpGetService,
-      FakeCacheService(),
-    );
+    const verifier: Verifier = FakeVerifier({
+      verifyCredential: async () => {
+        throw new Error('verifyCredential should not run');
+      },
+    });
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+      verifier,
+    });
+    const result = await lookupVcRecognition('did:web:university.example', registry, ctx);
     expect(result).to.deep.equal({
       status: 'unchecked',
       registryName: 'Recognition List',
@@ -103,87 +99,111 @@ describe('lookupVcRecognition', () => {
   });
 
   it('matches issuer object id against acceptedIssuers', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = okVerify;
     const vc = buildVc({
       issuer: { id: 'did:web:learning-commission.example', type: 'RecognizedIssuer' },
     });
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
-    const result = await lookupVcRecognition(
-      'did:web:university.example',
-      registry,
-      httpGetService,
-      FakeCacheService(),
-    );
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+    });
+    const result = await lookupVcRecognition('did:web:university.example', registry, ctx);
     expect(result.status).to.equal('found');
   });
 
   it('returns unchecked when verifyCredential reports not verified', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = async () => ({
-      verified: false,
-      credential: stubCredential,
-      results: [],
-    });
     const vc = buildVc();
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
-    const result = await lookupVcRecognition(
-      'did:web:university.example',
-      registry,
-      httpGetService,
-      FakeCacheService(),
-    );
+    const verifier = FakeVerifier({
+      verifyCredential: async () =>
+        ({
+          verified: false,
+          credential: {} as VerifiableCredential,
+          results: [],
+        }) satisfies CredentialVerificationResult,
+    });
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+      verifier,
+    });
+    const result = await lookupVcRecognition('did:web:university.example', registry, ctx);
     expect(result).to.deep.equal({
       status: 'unchecked',
       registryName: 'Recognition List',
     });
   });
 
+  it('passes registries: [] to recursive verifyCredential to break recursion', async () => {
+    const vc = buildVc();
+    let captured: Parameters<Verifier['verifyCredential']>[0] | undefined;
+    const verifier = FakeVerifier({
+      verifyCredential: async call => {
+        captured = call;
+        return {
+          verified: true,
+          credential: {} as VerifiableCredential,
+          results: [],
+        } satisfies CredentialVerificationResult;
+      },
+    });
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+      verifier,
+    });
+    await lookupVcRecognition('did:web:university.example', registry, ctx);
+    expect(captured?.registries).to.deep.equal([]);
+  });
+
   it('calls verifyCredential only once when response is cached', async () => {
     let verifyCalls = 0;
-    vcRecognitionVerifyCredentialOverride.fn = async opts => {
-      verifyCalls++;
-      return okVerify(opts);
-    };
+    const verifier = FakeVerifier({
+      verifyCredential: async () => {
+        verifyCalls++;
+        return {
+          verified: true,
+          credential: {} as VerifiableCredential,
+          results: [],
+        } satisfies CredentialVerificationResult;
+      },
+    });
     const vc = buildVc();
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
-    const cache = FakeCacheService();
-    await lookupVcRecognition('did:web:university.example', registry, httpGetService, cache);
-    await lookupVcRecognition('did:web:university.example', registry, httpGetService, cache);
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+      verifier,
+    });
+    await lookupVcRecognition('did:web:university.example', registry, ctx);
+    await lookupVcRecognition('did:web:university.example', registry, ctx);
     expect(verifyCalls).to.equal(1);
   });
 
   it('uses validUntil for cache TTL', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = okVerify;
     const future = new Date(Date.now() + 7200_000).toISOString();
     const vc = buildVc({ validUntil: future });
-    const httpGetService = FakeHttpGetService({ [listUrl]: okJsonBody(vc) });
     const base = FakeCacheService();
     const sets: Array<{ ttl?: number }> = [];
-    const cache = {
+    const cacheService = {
       get: base.get.bind(base),
       set: async (key: string, value: unknown, ttl?: number) => {
         sets.push({ ttl });
         return base.set(key, value, ttl);
       },
     };
-    await lookupVcRecognition('did:web:university.example', registry, httpGetService, cache);
+    const ctx = buildCtx({
+      httpGetService: FakeHttpGetService({ [listUrl]: okJsonBody(vc) }),
+      cacheService,
+    });
+    await lookupVcRecognition('did:web:university.example', registry, ctx);
     const ttlArg = sets[0]?.ttl as number;
     expect(ttlArg).to.be.greaterThan(7000_000);
     expect(ttlArg).to.be.at.most(7200_000);
   });
 
   it('returns unchecked on fetch failure', async () => {
-    vcRecognitionVerifyCredentialOverride.fn = okVerify;
-    const httpGetService = {
-      async get() {
-        throw new Error('network');
+    const ctx = buildCtx({
+      httpGetService: {
+        async get() {
+          throw new Error('network');
+        },
       },
-    };
-    const result = await lookupVcRecognition(
-      'did:web:university.example',
-      registry,
-      httpGetService,
-      FakeCacheService(),
-    );
+    });
+    const result = await lookupVcRecognition('did:web:university.example', registry, ctx);
     expect(result).to.deep.equal({
       status: 'unchecked',
       registryName: 'Recognition List',
@@ -197,13 +217,15 @@ describe('lookupVcRecognition', () => {
       url: 'https://example.com/r.json',
     };
     let calls = 0;
-    const httpGetService = {
-      async get() {
-        calls++;
-        return okJsonBody({});
+    const ctx = buildCtx({
+      httpGetService: {
+        async get() {
+          calls++;
+          return okJsonBody({});
+        },
       },
-    };
-    const result = await lookupVcRecognition('did:key:x', dcc, httpGetService, FakeCacheService());
+    });
+    const result = await lookupVcRecognition('did:key:x', dcc, ctx);
     expect(result).to.deep.equal({ status: 'unchecked', registryName: 'Legacy' });
     expect(calls).to.equal(0);
   });

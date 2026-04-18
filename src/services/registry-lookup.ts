@@ -9,6 +9,7 @@ import type {
   LookupIssuersOptions,
   RegistryLookupResult,
 } from '../types/registry.js';
+import type { Verifier } from '../types/verifier.js';
 import type { CacheService } from './cache-service/cache-service.js';
 import type { HttpGetService } from './http-get-service/http-get-service.js';
 import { InMemoryCacheService } from './cache-service/in-memory-cache-service.js';
@@ -16,7 +17,10 @@ import { BuiltinHttpGetService } from './http-get-service/builtin-http-get-servi
 import { lookupDccLegacy } from './registry-handlers/dcc-legacy-handler.js';
 import { lookupOidf } from './registry-handlers/oidf-handler.js';
 import { lookupVcRecognition } from './registry-handlers/vc-recognition-handler.js';
-import type { RegistryHandlerMap } from './registry-handlers/types.js';
+import type {
+  RegistryHandlerContext,
+  RegistryHandlerMap,
+} from './registry-handlers/types.js';
 import { registryKeyHash } from '../util/registry-key-hash.js';
 import { DEFAULT_TTL_MS } from './registry-handlers/cache-ttl.js';
 
@@ -27,10 +31,19 @@ const defaultHandlers: RegistryHandlerMap = {
 };
 
 /**
- * Build a {@link LookupIssuers} using `httpGetService`, `cacheService`, and optional per-type handlers.
+ * Build a {@link LookupIssuers} using `httpGetService`, `cacheService`,
+ * optional per-type `handlers`, and an optional `verifier`.
  *
- * The returned function caches lookup results at the DID level, using a cache key
- * that incorporates the DID and a canonicalized hash of the registries array.
+ * The `verifier` is threaded through to handlers via
+ * {@link RegistryHandlerContext} — required by the `vc-recognition`
+ * handler so it can recursively verify the recognition credential. If
+ * not provided, vc-recognition lookups will throw a clear error when
+ * invoked. `dcc-legacy` and `oidf` handlers do not use the verifier and
+ * work fine without one.
+ *
+ * The returned function caches lookup results at the DID level, using a
+ * cache key that incorporates the DID and a canonicalized hash of the
+ * registries array.
  *
  * Options:
  * - `fresh: true` — bypass the DID-level result cache (but underlying data caches still apply)
@@ -40,16 +53,15 @@ export function createRegistryLookup(
   httpGetService: HttpGetService,
   cacheService: CacheService,
   handlers: RegistryHandlerMap = defaultHandlers,
+  verifier?: Verifier,
 ): LookupIssuers {
   return async (
     did: string,
     registries: EntityIdentityRegistry[],
     options?: LookupIssuersOptions,
   ): Promise<RegistryLookupResult> => {
-    // Compute cache key for DID-level result caching
     const cacheKey = `reg-result:${did}:${registryKeyHash(registries)}`;
 
-    // Check cache unless fresh lookup requested
     if (!options?.fresh) {
       const cached = (await cacheService.get(cacheKey)) as RegistryLookupResult | undefined;
       if (cached) {
@@ -57,15 +69,24 @@ export function createRegistryLookup(
       }
     }
 
-    // Perform lookup
+    const ctx: RegistryHandlerContext = {
+      httpGetService,
+      cacheService,
+      get verifier(): Verifier {
+        if (verifier === undefined) {
+          throwUnboundVerifier();
+        }
+        return verifier;
+      },
+    };
+
     const matchingRegistries: string[] = [];
     const uncheckedRegistries: string[] = [];
 
     for (const registry of registries) {
-      const outcome = await handlers[registry.type](did, registry, httpGetService, cacheService);
+      const outcome = await handlers[registry.type](did, registry, ctx);
       if (outcome.status === 'found') {
         matchingRegistries.push(outcome.registryName);
-        // Short-circuit unless exhaustive mode
         if (!options?.exhaustive) {
           break;
         }
@@ -80,15 +101,12 @@ export function createRegistryLookup(
       uncheckedRegistries,
     };
 
-    // Cache the result (unless this was a fresh lookup that explicitly wants to skip cache)
-    // Actually, we should still cache the result for next time — fresh just means "don't use cache for read"
     await cacheService.set(cacheKey, result, DEFAULT_TTL_MS);
 
     return result;
   };
 }
 
-// Shared service instances for default lookup
 const sharedCacheService = InMemoryCacheService();
 const sharedHttpGetService = BuiltinHttpGetService();
 
@@ -97,7 +115,20 @@ const sharedHttpGetService = BuiltinHttpGetService();
  * context). Uses {@link BuiltinHttpGetService} and a shared in-memory cache.
  *
  * The shared cache enables cross-call caching for the default case.
+ *
+ * Note: this fallback has no `Verifier`, so vc-recognition lookups
+ * triggered through it will throw. Construct a {@link Verifier} via
+ * `createVerifier(...)` for any flow that uses vc-recognition. Slated
+ * for removal in a follow-up phase once all callers go through
+ * `createVerifier`.
  */
 export const defaultLookupIssuers: LookupIssuers = async (did, registries, options) => {
   return createRegistryLookup(sharedHttpGetService, sharedCacheService)(did, registries, options);
 };
+
+function throwUnboundVerifier(): never {
+  throw new Error(
+    'vc-recognition lookup invoked without a verifier in RegistryHandlerContext — ' +
+      'use createVerifier() to construct a verifier that threads itself through.',
+  );
+}
