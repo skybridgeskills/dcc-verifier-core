@@ -3,7 +3,7 @@
  *
  * Every check receives a `VerificationContext`. It carries injected services
  * (document loader, plain JSON fetch, crypto) and configuration (registries, challenge).
- * Callers build it via `buildContext()` with optional overrides.
+ * Built internally by `createVerifier(...)` from a {@link VerifierConfig}.
  *
  * In hexagonal terms, this is where adapters (concrete implementations) are
  * assembled and handed to the core domain. The core never imports concrete
@@ -39,7 +39,7 @@ export type FetchJson = (url: string) => Promise<unknown>;
 /**
  * Shared resources and configuration available to all verification checks.
  *
- * Built by `buildContext()` from caller-provided `VerifyCredentialOptions`.
+ * Built by `createVerifier(...)` from a caller-provided `VerifierConfig`.
  */
 export interface VerificationContext {
   documentLoader: DocumentLoader;

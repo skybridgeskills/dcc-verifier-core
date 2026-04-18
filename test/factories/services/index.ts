@@ -13,3 +13,4 @@ export { FakeRegistryLookup } from './fake-registry-lookup.js';
 export type { FakeRegistryLookupOptions } from './fake-registry-lookup.js';
 export { FakeVerifier } from './fake-verifier.js';
 export type { FakeVerifierOptions } from './fake-verifier.js';
+export { buildTestContext } from './build-test-context.js';

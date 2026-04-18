@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { runSuites } from '../../src/run-suites.js';
 import { registrySuite } from '../../src/suites/registry/index.js';
-import { buildContext } from '../../src/defaults.js';
+import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { VerificationContext } from '../../src/types/context.js';
 import type { EntityIdentityRegistry } from '../../src/types/registry.js';
@@ -17,7 +17,7 @@ const testRegistries: EntityIdentityRegistry[] = [
 ];
 
 describe('Registry Suite', () => {
-  const baseContext = buildContext();
+  const baseContext = buildTestContext();
 
   const createSubject = (credential: unknown): VerificationSubject => ({
     verifiableCredential: credential,

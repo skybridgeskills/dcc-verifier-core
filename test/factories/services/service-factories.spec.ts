@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { buildContext } from '../../../src/defaults.js';
+import { buildTestContext } from './build-test-context.js';
 import { FakeCryptoService, hasDataIntegrityProof } from './fake-crypto-service.js';
 import { FakeDocumentLoader } from './fake-document-loader.js';
 import { FakeCacheService } from './fake-cache-service.js';
@@ -169,8 +169,8 @@ describe('service factories', () => {
     });
   });
 
-  it('buildContext accepts fake crypto and fetchJson', async () => {
-    const ctx = buildContext({
+  it('buildTestContext accepts fake crypto and fetchJson', async () => {
+    const ctx = buildTestContext({
       cryptoServices: [FakeCryptoService({ verified: true })],
       fetchJson: FakeFetchJson({ 'https://factory.test/json': { ok: true } }),
     });
@@ -208,12 +208,12 @@ describe('service factories', () => {
     });
   });
 
-  describe('buildContext with httpGetService', () => {
+  describe('buildTestContext with httpGetService', () => {
     it('derives fetchJson from httpGetService', async () => {
       const httpGetService = FakeHttpGetService({
         'https://factory.test/json': okJsonBody({ derived: true }),
       });
-      const ctx = buildContext({ httpGetService });
+      const ctx = buildTestContext({ httpGetService });
       const json = await ctx.fetchJson('https://factory.test/json');
       expect(json).to.deep.equal({ derived: true });
     });
@@ -222,7 +222,7 @@ describe('service factories', () => {
       const httpGetService = FakeHttpGetService({
         'https://factory.test/json': okJsonBody({ fromHttp: true }),
       });
-      const ctx = buildContext({
+      const ctx = buildTestContext({
         httpGetService,
         fetchJson: FakeFetchJson({ 'https://factory.test/json': { fromExplicit: true } }),
       });
@@ -235,7 +235,7 @@ describe('service factories', () => {
       const httpGetService = FakeHttpGetService({
         'https://example.test/remote': okJsonBody({ wrong: true }),
       });
-      const ctx = buildContext({
+      const ctx = buildTestContext({
         httpGetService,
         documentLoader: FakeDocumentLoader({ 'https://example.test/remote': doc }),
       });
@@ -247,12 +247,12 @@ describe('service factories', () => {
 
     it('passes cacheService through on context', () => {
       const cacheService = FakeCacheService();
-      const ctx = buildContext({ cacheService });
+      const ctx = buildTestContext({ cacheService });
       expect(ctx.cacheService).to.equal(cacheService);
     });
 
     it('sets effective httpGetService on context when caller omits it', () => {
-      const ctx = buildContext({});
+      const ctx = buildTestContext({});
       expect(ctx.httpGetService).to.be.an('object');
       expect(typeof ctx.httpGetService?.get).to.equal('function');
     });

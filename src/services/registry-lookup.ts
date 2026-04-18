@@ -12,8 +12,6 @@ import type {
 import type { Verifier } from '../types/verifier.js';
 import type { CacheService } from './cache-service/cache-service.js';
 import type { HttpGetService } from './http-get-service/http-get-service.js';
-import { InMemoryCacheService } from './cache-service/in-memory-cache-service.js';
-import { BuiltinHttpGetService } from './http-get-service/builtin-http-get-service.js';
 import { lookupDccLegacy } from './registry-handlers/dcc-legacy-handler.js';
 import { lookupOidf } from './registry-handlers/oidf-handler.js';
 import { lookupVcRecognition } from './registry-handlers/vc-recognition-handler.js';
@@ -81,7 +79,10 @@ export function createRegistryLookup(
       cacheService,
       get verifier(): Verifier {
         if (getVerifier === undefined) {
-          throwUnboundVerifier();
+          throw new Error(
+            'vc-recognition lookup invoked without a verifier in RegistryHandlerContext — ' +
+              'use createVerifier() to construct a verifier that threads itself through.',
+          );
         }
         return getVerifier();
       },
@@ -112,30 +113,4 @@ export function createRegistryLookup(
 
     return result;
   };
-}
-
-const sharedCacheService = InMemoryCacheService();
-const sharedHttpGetService = BuiltinHttpGetService();
-
-/**
- * Fallback when {@link VerificationContext.lookupIssuers} is missing (e.g. hand-built
- * context). Uses {@link BuiltinHttpGetService} and a shared in-memory cache.
- *
- * The shared cache enables cross-call caching for the default case.
- *
- * Note: this fallback has no `Verifier`, so vc-recognition lookups
- * triggered through it will throw. Construct a {@link Verifier} via
- * `createVerifier(...)` for any flow that uses vc-recognition. Slated
- * for removal in a follow-up phase once all callers go through
- * `createVerifier`.
- */
-export const defaultLookupIssuers: LookupIssuers = async (did, registries, options) => {
-  return createRegistryLookup(sharedHttpGetService, sharedCacheService)(did, registries, options);
-};
-
-function throwUnboundVerifier(): never {
-  throw new Error(
-    'vc-recognition lookup invoked without a verifier in RegistryHandlerContext — ' +
-      'use createVerifier() to construct a verifier that threads itself through.',
-  );
 }

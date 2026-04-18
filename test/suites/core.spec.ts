@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 import { runSuites } from '../../src/run-suites.js';
 import { coreSuite } from '../../src/suites/core/index.js';
-import { buildContext } from '../../src/defaults.js';
+import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 
 describe('Core Structure Suite', () => {
-  const context = buildContext();
+  const context = buildTestContext();
 
   const createSubject = (credential: unknown): VerificationSubject => ({
     verifiableCredential: credential,

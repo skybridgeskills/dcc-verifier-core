@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { runSuites } from '../../src/run-suites.js';
 import { statusSuite } from '../../src/suites/status/index.js';
-import { buildContext } from '../../src/defaults.js';
+import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import {
   BitstringStatusEntry,
@@ -18,7 +18,7 @@ describe('Status Suite', () => {
 
   describe('credential with no credentialStatus', () => {
     it('skips check when credential has no status', async () => {
-      const context = buildContext();
+      const context = buildTestContext();
       const subject = createSubject(CredentialFactory({ version: 'v2', credential: {} }));
       const results = await runSuites([statusSuite], subject, context);
 
@@ -46,7 +46,7 @@ describe('Status Suite', () => {
         },
       });
       const subject = createSubject(cred);
-      const results = await runSuites([statusSuite], subject, buildContext());
+      const results = await runSuites([statusSuite], subject, buildTestContext());
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('skipped');
@@ -69,7 +69,7 @@ describe('Status Suite', () => {
         },
       });
       const subject = createSubject(cred);
-      const results = await runSuites([statusSuite], subject, buildContext());
+      const results = await runSuites([statusSuite], subject, buildTestContext());
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('skipped');
@@ -86,7 +86,7 @@ describe('Status Suite', () => {
         listLength: 32,
       });
       const documentLoader = FakeDocumentLoader({ [listUrl]: slCred });
-      const context = buildContext({
+      const context = buildTestContext({
         documentLoader,
         verifyBitstringStatusListCredential: false,
       });
@@ -118,7 +118,7 @@ describe('Status Suite', () => {
         listLength: 32,
       });
       const documentLoader = FakeDocumentLoader({ [listUrl]: slCred });
-      const context = buildContext({
+      const context = buildTestContext({
         documentLoader,
         verifyBitstringStatusListCredential: false,
       });
@@ -148,7 +148,7 @@ describe('Status Suite', () => {
       this.timeout(15000);
       const listUrl = 'https://factory.test/status/missing';
       const documentLoader = FakeDocumentLoader({});
-      const context = buildContext({
+      const context = buildTestContext({
         documentLoader,
         verifyBitstringStatusListCredential: false,
       });
@@ -186,7 +186,7 @@ describe('Status Suite', () => {
         },
       });
       const subject = createSubject(cred);
-      const results = await runSuites([statusSuite], subject, buildContext());
+      const results = await runSuites([statusSuite], subject, buildTestContext());
 
       expect(results).to.have.lengthOf(1);
       expect(results[0].outcome.status).to.equal('skipped');

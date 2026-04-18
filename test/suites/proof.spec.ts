@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { runSuites } from '../../src/run-suites.js';
 import { proofSuite } from '../../src/suites/proof/index.js';
-import { buildContext } from '../../src/defaults.js';
+import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { PresentationFactory } from '../factories/data/presentation-factory.js';
@@ -33,7 +33,7 @@ describe('Proof Verification Suite', () => {
 
   describe('FakeCryptoService — credential', () => {
     it('returns success when service verifies', async () => {
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ verified: true })],
       });
       const subject = createCredentialSubject(CredentialFactory({ version: 'v2', credential: {} }));
@@ -55,7 +55,7 @@ describe('Proof Verification Suite', () => {
           detail: 'Tampered payload',
         },
       ];
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ verified: false, problems })],
       });
       const subject = createCredentialSubject(CredentialFactory({ version: 'v2', credential: {} }));
@@ -68,7 +68,7 @@ describe('Proof Verification Suite', () => {
     });
 
     it('fails when no crypto service matches canVerify', async () => {
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ canVerify: () => false, verified: true })],
       });
       const subject = createCredentialSubject(CredentialFactory({ version: 'v2', credential: {} }));
@@ -81,7 +81,7 @@ describe('Proof Verification Suite', () => {
     });
 
     it('maps thrown errors to PROOF_VERIFICATION_ERROR', async () => {
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [
           FakeCryptoService({ throwInVerify: new Error('Crypto adapter exploded') }),
         ],
@@ -101,7 +101,7 @@ describe('Proof Verification Suite', () => {
 
   describe('FakeCryptoService — presentation', () => {
     it('verifies presentation when service returns success', async () => {
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ verified: true })],
         challenge: 'factory-challenge',
       });
@@ -115,7 +115,7 @@ describe('Proof Verification Suite', () => {
     });
 
     it('handles unsigned presentation when context allows it', async () => {
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ verified: true })],
         unsignedPresentation: true,
       });
@@ -138,7 +138,7 @@ describe('Proof Verification Suite', () => {
           detail: 'did:web resolution failed',
         },
       ];
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ verified: false, problems })],
       });
       const cred = CredentialFactory({
@@ -166,7 +166,7 @@ describe('Proof Verification Suite', () => {
           detail: 'Invalid JSON-LD document',
         },
       ];
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ verified: false, problems })],
       });
       const cred = CredentialFactory({
@@ -187,7 +187,7 @@ describe('Proof Verification Suite', () => {
 
   describe('no subject', () => {
     it('skips check when neither credential nor presentation provided', async () => {
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [FakeCryptoService({ verified: true })],
       });
       const subject: VerificationSubject = {};
@@ -197,7 +197,7 @@ describe('Proof Verification Suite', () => {
     });
 
     it('fails when credential has no proof and adapter requires one', async () => {
-      const context = buildContext({
+      const context = buildTestContext({
         cryptoServices: [
           FakeCryptoService({ canVerify: subjectHasLinkedDataProof, verified: true }),
         ],

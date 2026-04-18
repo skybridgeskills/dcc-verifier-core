@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { runSuites } from '../../src/run-suites.js';
 import { obv3SchemaSuite } from '../../src/suites/schema/obv3/index.js';
-import { buildContext } from '../../src/defaults.js';
+import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { compose } from '../factories/data/compose.js';
@@ -47,7 +47,7 @@ describe('OBv3 Schema Suite', () => {
           ],
         },
       });
-      const context = buildContext({
+      const context = buildTestContext({
         fetchJson: FakeFetchJson({}),
       });
       const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
@@ -61,7 +61,7 @@ describe('OBv3 Schema Suite', () => {
       const fetchJson = FakeFetchJson({
         [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: minimalSchema(OBV3_V2_ACHIEVEMENT_SCHEMA_URL),
       });
-      const context = buildContext({ fetchJson });
+      const context = buildTestContext({ fetchJson });
       const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
@@ -76,7 +76,7 @@ describe('OBv3 Schema Suite', () => {
       const fetchJson = FakeFetchJson({
         [OBV3_V2_ENDORSEMENT_SCHEMA_URL]: minimalSchema(OBV3_V2_ENDORSEMENT_SCHEMA_URL),
       });
-      const context = buildContext({ fetchJson });
+      const context = buildTestContext({ fetchJson });
       const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
@@ -90,7 +90,7 @@ describe('OBv3 Schema Suite', () => {
       const fetchJson = FakeFetchJson({
         [OBV3_V2_ACHIEVEMENT_SCHEMA_URL]: minimalSchema(OBV3_V2_ACHIEVEMENT_SCHEMA_URL),
       });
-      const context = buildContext({ fetchJson });
+      const context = buildTestContext({ fetchJson });
       const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
@@ -116,7 +116,7 @@ describe('OBv3 Schema Suite', () => {
       const fetchJson = FakeFetchJson({
         [customUrl]: minimalSchema(customUrl),
       });
-      const context = buildContext({ fetchJson });
+      const context = buildTestContext({ fetchJson });
       const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
@@ -137,7 +137,7 @@ describe('OBv3 Schema Suite', () => {
       const fetchJson = FakeFetchJson({
         [customUrl]: minimalSchema(customUrl),
       });
-      const context = buildContext({ fetchJson });
+      const context = buildTestContext({ fetchJson });
       const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
 
       const schemaCheck = results.find(r => r.check === 'schema.obv3.json');
@@ -146,7 +146,7 @@ describe('OBv3 Schema Suite', () => {
 
     it('fails when schema URL cannot be fetched', async () => {
       const cred = CredentialFactory({ version: 'v2', credential: {} });
-      const context = buildContext({
+      const context = buildTestContext({
         fetchJson: FakeFetchJson({}),
       });
       const results = await runSuites([obv3SchemaSuite], createSubject(cred), context);
@@ -168,7 +168,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
@@ -198,7 +198,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
@@ -213,7 +213,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
@@ -243,7 +243,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
@@ -284,7 +284,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
@@ -312,7 +312,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
@@ -340,7 +340,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
@@ -368,7 +368,7 @@ describe('OBv3 Schema Suite', () => {
       const results = await runSuites(
         [obv3SchemaSuite],
         createSubject(cred),
-        buildContext(),
+        buildTestContext(),
       );
 
       expect(results).to.have.lengthOf(2);

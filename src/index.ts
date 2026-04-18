@@ -58,18 +58,12 @@ export { obv3SchemaSuite } from './suites/schema/index.js';
 // ==================== Utilities ====================
 
 export { runSuites } from './run-suites.js';
-export {
-  buildContext,
-  defaultSuites,
-  defaultDocumentLoader,
-  defaultFetchJson,
-  defaultHttpGetService,
-  defaultCacheService,
-  defaultLookupIssuers,
-  defaultCryptoSuites,
-  defaultCryptoServices,
-} from './defaults.js';
 export { createRegistryLookup } from './services/registry-lookup.js';
+export type {
+  RegistryHandlerContext,
+  RegistryHandlerMap,
+  RegistryHandler,
+} from './services/registry-handlers/types.js';
 export {
   DEFAULT_TTL_MS,
   parseCacheControlMaxAge,
