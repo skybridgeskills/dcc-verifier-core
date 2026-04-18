@@ -1,22 +1,14 @@
 /**
- * Verification result types.
+ * Verification result types returned by `verifyCredential` and
+ * `verifyPresentation` (and their `Verifier` instance equivalents).
  *
- * This module exports two sets of types:
- *
- * **Current** — `CredentialVerificationResult` and `PresentationVerificationResult`.
- * These use the suite-based `CheckResult[]` model and are what `verifyCredential`
- * and `verifyPresentation` actually return.
- *
- * **Legacy** — `VerificationResponse`, `PresentationVerificationResponse`, etc.
- * These use the older `log[]` / `errors[]` shape and are still exported for
- * backward compatibility with downstream consumers that haven't migrated.
- * They are not produced by the current verification functions.
+ * Both types use the suite-based `CheckResult[]` model. Each check
+ * result carries a discriminated `outcome` (success / failure /
+ * skipped) plus provenance (suite, check id, fatal flag, timestamp).
  */
 
 import { CheckResult } from './check.js';
 import { VerifiableCredential } from '../schemas/credential.js';
-
-// ==================== Current Suite-Based Result Types ====================
 
 /**
  * Result of credential verification.
@@ -54,63 +46,4 @@ export interface PresentationVerificationResult {
 
   /** All results flattened (presentation + all credential checks). */
   allResults: CheckResult[];
-}
-
-// ==================== Legacy Types (for backward compatibility) ====================
-
-export interface VerificationError {
-  message: string;
-  name?: string;
-  details?: object;
-  stackTrace?: unknown;
-}
-
-export interface VerificationStep {
-  id: string;
-  valid?: boolean;
-  foundInRegistries?: string[];
-  registriesNotLoaded?: RegistriesNotLoaded[];
-  error?: VerificationError;
-}
-
-export interface SchemaCheck {
-  schema: string;
-  result: { valid: boolean; errors?: object[] };
-  source: string;
-}
-
-export interface AdditionalInformationEntry {
-  id: string;
-  results: SchemaCheck[];
-}
-
-export interface VerificationResponse {
-  additionalInformation?: AdditionalInformationEntry[];
-  credential?: object;
-  errors?: VerificationError[];
-  log?: VerificationStep[];
-}
-
-const signatureOptions = ['valid', 'invalid', 'unsigned'] as const;
-export type PresentationSignatureResult = (typeof signatureOptions)[number]; // i.e., 'valid', 'invalid', 'unsigned'
-
-export interface PresentationResult {
-  signature: PresentationSignatureResult;
-  error?: unknown;
-}
-
-export interface PresentationVerificationResponse {
-  credentialResults?: VerificationResponse[];
-  presentationResult?: PresentationResult;
-  errors?: VerificationError[];
-}
-
-export interface RegistryListResult {
-  foundInRegistries: string[];
-  registriesNotLoaded: RegistriesNotLoaded[];
-}
-
-export interface RegistriesNotLoaded {
-  name: string;
-  url: string;
 }
