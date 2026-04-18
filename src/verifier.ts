@@ -34,7 +34,7 @@ import type {
   PresentationVerificationResult,
 } from './types/result.js';
 import { parseCredential, VerifiableCredential } from './schemas/credential.js';
-import { parsePresentation } from './schemas/presentation.js';
+import { parsePresentation, type VerifiablePresentation } from './schemas/presentation.js';
 import { runSuites } from './run-suites.js';
 import { extractCredentialsFrom } from './extract-credentials-from.js';
 import { defaultSuites } from './default-suites.js';
@@ -106,7 +106,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       return {
         verified: !hasFatalFailures(results),
-        credential: parsedCredential,
+        verifiableCredential: parsedCredential,
         results,
       };
     },
@@ -114,7 +114,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
     verifyPresentation: async (call: VerifyPresentationCall) => {
       const parseResult = parsePresentation(call.presentation);
       if (!parseResult.success) {
-        return parseFailurePresentationResult(parseResult.error);
+        return parseFailurePresentationResult(call.presentation, parseResult.error);
       }
       const parsedPresentation = parseResult.data;
 
@@ -161,12 +161,9 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       return {
         verified: presentationVerified && allCredentialsVerified,
+        verifiablePresentation: parsedPresentation,
         presentationResults,
         credentialResults,
-        allResults: [
-          ...presentationResults,
-          ...credentialResults.flatMap(cr => cr.results),
-        ],
       };
     },
   };
@@ -234,12 +231,13 @@ function parseFailureCredentialResult(
   };
   return {
     verified: false,
-    credential: credential as VerifiableCredential,
+    verifiableCredential: credential as VerifiableCredential,
     results: [parseErrorResult(problem)],
   };
 }
 
 function parseFailurePresentationResult(
+  presentation: unknown,
   error: { errors: Array<{ path: Array<string | number>; message: string }> },
 ): PresentationVerificationResult {
   const problem: ProblemDetail = {
@@ -250,8 +248,8 @@ function parseFailurePresentationResult(
   const result = parseErrorResult(problem);
   return {
     verified: false,
+    verifiablePresentation: presentation as VerifiablePresentation,
     presentationResults: [result],
     credentialResults: [],
-    allResults: [result],
   };
 }

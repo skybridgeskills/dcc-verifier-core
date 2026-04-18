@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { verifyPresentation } from '../src/index.js';
+import { flattenPresentationResults } from '../src/flatten-presentation-results.js';
 import { CredentialFactory } from './factories/data/credential-factory.js';
 import { PresentationFactory } from './factories/data/presentation-factory.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
@@ -18,7 +19,9 @@ describe('verifyPresentation', () => {
       expect(result.presentationResults).to.be.an('array');
       expect(result.credentialResults).to.be.an('array');
       expect(result.credentialResults).to.have.lengthOf(1);
-      expect(result.allResults).to.be.an('array');
+      expect(result.verifiablePresentation).to.exist;
+      expect(result.verifiablePresentation.type).to.include('VerifiablePresentation');
+      expect(flattenPresentationResults(result)).to.be.an('array');
     });
 
     it('verifies a presentation with multiple credentials', async () => {
@@ -98,7 +101,7 @@ describe('verifyPresentation', () => {
 
       for (const credResult of result.credentialResults) {
         expect(credResult.verified).to.be.a('boolean');
-        expect(credResult.credential).to.exist;
+        expect(credResult.verifiableCredential).to.exist;
         expect(credResult.results).to.be.an('array');
       }
     });
@@ -129,26 +132,27 @@ describe('verifyPresentation', () => {
 
       expect(result.credentialResults).to.have.lengthOf(2);
 
-      const ids = result.credentialResults.map(cr => cr.credential.id);
+      const ids = result.credentialResults.map(cr => cr.verifiableCredential.id);
       expect(ids).to.include(id1);
       expect(ids).to.include(id2);
     });
   });
 
-  describe('allResults aggregation', () => {
+  describe('flattenPresentationResults aggregation', () => {
     it('includes both presentation and credential results', async () => {
       const presentation = PresentationFactory();
       const result = await verifyPresentation({ presentation, ...fakeVerified });
 
       const presentationSuiteIds = result.presentationResults.map(r => r.suite);
-      const allSuiteIds = result.allResults.map(r => r.suite);
+      const flat = flattenPresentationResults(result);
+      const allSuiteIds = flat.map(e => e.result.suite);
 
       for (const suiteId of presentationSuiteIds) {
         expect(allSuiteIds).to.include(suiteId);
       }
     });
 
-    it('flattens all credential results into allResults', async () => {
+    it('flattens all credential results via flattenPresentationResults', async () => {
       const presentation = PresentationFactory({
         verifiableCredential: [
           CredentialFactory({ version: 'v1', credential: {} }),
@@ -157,7 +161,9 @@ describe('verifyPresentation', () => {
       });
       const result = await verifyPresentation({ presentation, ...fakeVerified });
 
-      expect(result.allResults.length).to.be.greaterThan(result.presentationResults.length);
+      expect(flattenPresentationResults(result).length).to.be.greaterThan(
+        result.presentationResults.length,
+      );
     });
   });
 
@@ -238,14 +244,14 @@ describe('verifyPresentation', () => {
       const result = await verifyPresentation({ presentation, ...fakeVerified });
 
       expect(result).to.have.property('verified');
+      expect(result).to.have.property('verifiablePresentation');
       expect(result).to.have.property('presentationResults');
       expect(result).to.have.property('credentialResults');
-      expect(result).to.have.property('allResults');
 
       expect(typeof result.verified).to.equal('boolean');
       expect(Array.isArray(result.presentationResults)).to.be.true;
       expect(Array.isArray(result.credentialResults)).to.be.true;
-      expect(Array.isArray(result.allResults)).to.be.true;
+      expect(flattenPresentationResults(result)).to.be.an('array');
     });
 
     it('each credential result has correct structure', async () => {
@@ -254,11 +260,11 @@ describe('verifyPresentation', () => {
 
       for (const credResult of result.credentialResults) {
         expect(credResult).to.have.property('verified');
-        expect(credResult).to.have.property('credential');
+        expect(credResult).to.have.property('verifiableCredential');
         expect(credResult).to.have.property('results');
 
         expect(typeof credResult.verified).to.equal('boolean');
-        expect(credResult.credential).to.be.an('object');
+        expect(credResult.verifiableCredential).to.be.an('object');
         expect(Array.isArray(credResult.results)).to.be.true;
       }
     });

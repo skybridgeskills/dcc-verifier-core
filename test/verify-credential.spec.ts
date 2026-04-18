@@ -20,7 +20,7 @@ describe('verifyCredential', () => {
       const result = await verifyCredential({ credential, ...fakeVerified });
 
       expect(result.verified).to.be.true;
-      expect(result.credential).to.exist;
+      expect(result.verifiableCredential).to.exist;
       expect(result.results).to.be.an('array');
       expect(result.results.length).to.be.greaterThan(0);
 
@@ -33,7 +33,7 @@ describe('verifyCredential', () => {
       const result = await verifyCredential({ credential, ...fakeVerified });
 
       expect(result.verified).to.be.true;
-      expect(result.credential).to.exist;
+      expect(result.verifiableCredential).to.exist;
       expect(result.results).to.be.an('array');
     });
 
@@ -214,9 +214,9 @@ describe('verifyCredential', () => {
       const credential = CredentialFactory({ version: 'v1', credential: {} });
       const result = await verifyCredential({ credential, ...fakeVerified });
 
-      expect(result.credential).to.exist;
-      expect(result.credential.id).to.equal(credential.id);
-      expect(result.credential.type).to.deep.equal(credential.type);
+      expect(result.verifiableCredential).to.exist;
+      expect(result.verifiableCredential.id).to.equal(credential.id);
+      expect(result.verifiableCredential.type).to.deep.equal(credential.type);
     });
 
     it('results contain suite and check IDs', async () => {
@@ -269,7 +269,7 @@ describe('verifyCredential', () => {
       const result = await verifyCredential({ credential, ...fakeVerified });
 
       expect(result.verified).to.be.a('boolean');
-      expect(result.credential.issuer).to.be.a('string');
+      expect(result.verifiableCredential.issuer).to.be.a('string');
     });
 
     it('handles object issuer', async () => {
@@ -277,7 +277,7 @@ describe('verifyCredential', () => {
       const result = await verifyCredential({ credential, ...fakeVerified });
 
       expect(result.verified).to.be.a('boolean');
-      expect(result.credential.issuer).to.be.an('object');
+      expect(result.verifiableCredential.issuer).to.be.an('object');
     });
   });
 });

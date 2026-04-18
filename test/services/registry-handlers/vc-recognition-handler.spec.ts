@@ -115,7 +115,7 @@ describe('lookupVcRecognition', () => {
       verifyCredential: async () =>
         ({
           verified: false,
-          credential: {} as VerifiableCredential,
+          verifiableCredential: {} as VerifiableCredential,
           results: [],
         }) satisfies CredentialVerificationResult,
     });
@@ -138,7 +138,7 @@ describe('lookupVcRecognition', () => {
         captured = call;
         return {
           verified: true,
-          credential: {} as VerifiableCredential,
+          verifiableCredential: {} as VerifiableCredential,
           results: [],
         } satisfies CredentialVerificationResult;
       },
@@ -158,7 +158,7 @@ describe('lookupVcRecognition', () => {
         verifyCalls++;
         return {
           verified: true,
-          credential: {} as VerifiableCredential,
+          verifiableCredential: {} as VerifiableCredential,
           results: [],
         } satisfies CredentialVerificationResult;
       },

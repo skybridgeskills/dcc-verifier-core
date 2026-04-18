@@ -1,14 +1,15 @@
 import type { Verifier } from '../../../src/types/verifier.js';
 import type { VerifiableCredential } from '../../../src/schemas/credential.js';
+import type { VerifiablePresentation } from '../../../src/schemas/presentation.js';
 import type {
   CredentialVerificationResult,
   PresentationVerificationResult,
 } from '../../../src/types/result.js';
 
 export interface FakeVerifierOptions {
-  /** Override `verifyCredential`. Default: returns `{ verified: true, credential: {} as VerifiableCredential, results: [] }`. */
+  /** Override `verifyCredential`. Default: returns `{ verified: true, verifiableCredential: {} as VerifiableCredential, results: [] }`. */
   verifyCredential?: Verifier['verifyCredential'];
-  /** Override `verifyPresentation`. Default: returns `{ verified: true, presentationResults: [], credentialResults: [], allResults: [] }`. */
+  /** Override `verifyPresentation`. Default: returns `{ verified: true, verifiablePresentation: stub, presentationResults: [], credentialResults: [] }` (no pre-flattened check list). */
   verifyPresentation?: Verifier['verifyPresentation'];
 }
 
@@ -26,14 +27,14 @@ export function FakeVerifier(options: FakeVerifierOptions = {}): Verifier {
 const defaultVerifyCredential: Verifier['verifyCredential'] = async () =>
   ({
     verified: true,
-    credential: {} as VerifiableCredential,
+    verifiableCredential: {} as VerifiableCredential,
     results: [],
   }) satisfies CredentialVerificationResult;
 
 const defaultVerifyPresentation: Verifier['verifyPresentation'] = async () =>
   ({
     verified: true,
+    verifiablePresentation: {} as VerifiablePresentation,
     presentationResults: [],
     credentialResults: [],
-    allResults: [],
   }) satisfies PresentationVerificationResult;

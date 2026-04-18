@@ -64,3 +64,7 @@ export type {
 } from './services/registry-handlers/types.js';
 export { DataIntegrityCryptoService } from './services/data-integrity-crypto.js';
 export type { DataIntegrityCryptoConfig } from './services/data-integrity-crypto.js';
+export {
+  flattenPresentationResults,
+} from './flatten-presentation-results.js';
+export type { FlattenedCheckResult } from './flatten-presentation-results.js';
