@@ -148,12 +148,13 @@ export async function verifyPresentation(
       title: 'Presentation Parsing Failed',
       detail: parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
     };
+    const checkResult = createParseErrorResult(problem);
 
     return {
       verified: false,
-      presentationResults: [createParseErrorResult(problem)],
+      presentationResults: [checkResult],
       credentialResults: [],
-      allResults: [createParseErrorResult(problem)],
+      allResults: [checkResult],
     };
   }
 

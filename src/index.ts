@@ -5,6 +5,13 @@
 // ==================== Main Public API ====================
 
 export { verifyCredential, verifyPresentation } from './verify-suite.js';
+export { createVerifier } from './verifier.js';
+export type {
+  Verifier,
+  VerifierConfig,
+  VerifyCredentialCall,
+  VerifyPresentationCall,
+} from './types/verifier.js';
 export type { CredentialVerificationResult, PresentationVerificationResult } from './types/result.js';
 export type { VerifyCredentialOptions, VerifyPresentationOptions } from './types/options.js';
 export type {
