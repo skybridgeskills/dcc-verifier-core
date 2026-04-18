@@ -2,13 +2,21 @@
  * Lazy memoized factories for the default service implementations the
  * `Verifier` falls back to when the caller doesn't pass overrides.
  *
- * Memoization is per-process and only of *construction*. Each factory
- * caches the constructed object so we don't pay for repeated module
- * setup, but the returned objects are themselves stateless adapters
- * (HTTP, JSON-LD loader) — except for `defaultCacheService`, which
- * intentionally returns a fresh in-memory store on first call so two
- * separate `createVerifier()` instances default to the same underlying
- * cache.
+ * Memoization is per-process and only of *construction* — never of
+ * mutable state.
+ *
+ * - `defaultHttpGetService()` returns a memoized
+ *   `BuiltinHttpGetService` (stateless adapter; safe to share).
+ * - `defaultCryptoSuites()` and `defaultCryptoServices()` cache the
+ *   constructed instances so we don't pay for repeated module setup;
+ *   the suites/services themselves carry no cross-call state.
+ * - `defaultDocumentLoaderFor()` reuses the bundled `securityLoader`
+ *   instance when called with the default HTTP service, otherwise
+ *   derives a fresh loader.
+ * - `createDefaultCacheService()` returns a **fresh**
+ *   `InMemoryCacheService` on every call so two independent
+ *   `createVerifier()` calls do not share cache state. Callers who
+ *   want cross-verifier sharing pass an explicit `cacheService`.
  *
  * Internal module — not exported from `index.ts`.
  */
@@ -27,16 +35,24 @@ import type { DocumentLoader } from './types/context.js';
 import type { HttpGetService } from './services/http-get-service/http-get-service.js';
 import type { CacheService } from './services/cache-service/cache-service.js';
 
-/** Default {@link HttpGetService}. Memoized per process. */
+/** Default {@link HttpGetService}. Memoized per process (stateless adapter). */
 export function defaultHttpGetService(): HttpGetService {
   if (!cachedHttp) cachedHttp = BuiltinHttpGetService();
   return cachedHttp;
 }
 
-/** Default {@link CacheService}. Memoized per process — see module doc. */
-export function defaultCacheService(): CacheService {
-  if (!cachedCache) cachedCache = InMemoryCacheService();
-  return cachedCache;
+/**
+ * Construct the default {@link CacheService} — a fresh
+ * `InMemoryCacheService` on every call.
+ *
+ * Each `createVerifier()` invocation that doesn't pass an explicit
+ * `cacheService` therefore owns an isolated in-memory cache. To share
+ * cache state across verifiers, construct one `InMemoryCacheService`
+ * (or any `CacheService` adapter) and pass it as
+ * `createVerifier({ cacheService })` to each verifier.
+ */
+export function createDefaultCacheService(): CacheService {
+  return InMemoryCacheService();
 }
 
 /**
@@ -85,7 +101,6 @@ export function defaultDocumentLoaderFor(httpGetService: HttpGetService): Docume
 }
 
 let cachedHttp: HttpGetService | undefined;
-let cachedCache: CacheService | undefined;
 let cachedCryptoSuites: CryptoSuite[] | undefined;
 let cachedCryptoServices: CryptoService[] | undefined;
 let cachedDocumentLoader: DocumentLoader | undefined;

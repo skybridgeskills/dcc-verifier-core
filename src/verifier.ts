@@ -2,9 +2,16 @@
  * `createVerifier(...)` — factory for a configured {@link Verifier}.
  *
  * A `Verifier` owns long-lived dependencies (HTTP, cache, crypto
- * services, registries, registry handlers, document loader) and exposes
- * per-call `verifyCredential` / `verifyPresentation` methods that share
- * those dependencies — most importantly the cache.
+ * services, registries, registry handlers, document loader) and
+ * exposes per-call `verifyCredential` / `verifyPresentation` methods
+ * that share those dependencies — most importantly the cache.
+ *
+ * Each verifier without an explicit `cacheService` gets its own fresh
+ * `InMemoryCacheService`; cache contents are isolated from other
+ * verifiers in the same process. To share cache state across verifiers
+ * (e.g. a long-running service holding several pre-built verifiers),
+ * construct one `InMemoryCacheService` (or any `CacheService` adapter)
+ * and pass it via `createVerifier({ cacheService })`.
  *
  * Construct a single `Verifier` for any batch or repeated verification
  * work; reusing the instance lets issuer DID documents, status list
@@ -41,7 +48,7 @@ import { defaultSuites } from './default-suites.js';
 import { proofSuite } from './suites/proof/index.js';
 import {
   defaultHttpGetService,
-  defaultCacheService,
+  createDefaultCacheService,
   defaultCryptoServices,
   defaultCryptoSuites,
   defaultDocumentLoaderFor,
@@ -54,7 +61,7 @@ import { ProblemTypes } from './problem-types.js';
 
 export function createVerifier(config: VerifierConfig = {}): Verifier {
   const httpGetService = config.httpGetService ?? defaultHttpGetService();
-  const cacheService = config.cacheService ?? defaultCacheService();
+  const cacheService = config.cacheService ?? createDefaultCacheService();
   const cryptoServices = config.cryptoServices ?? defaultCryptoServices();
   const documentLoader = config.documentLoader ?? defaultDocumentLoaderFor(httpGetService);
   const fetchJson = fetchJsonFromHttpGet(httpGetService);
