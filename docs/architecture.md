@@ -27,9 +27,11 @@ src/
 ├── verifier.ts                      createVerifier(config) factory + internal context builder (composition root)
 ├── verify-suite.ts                  Standalone verifyCredential / verifyPresentation wrappers over createVerifier
 ├── default-suites.ts                Internal: defaultSuites array (core → proof → status → registry → schema.obv3)
-├── default-services.ts              Internal: lazy-memoized factories for default httpGetService, cacheService, cryptoServices, documentLoader
+├── default-services.ts              Internal: lazy factories for default httpGetService, cryptoServices, documentLoader (memoized) + per-call createDefaultCacheService
 ├── run-suites.ts                    Suite orchestration engine
-├── extractCredentialsFrom.ts        Normalize VP's embedded credentials to array
+├── extract-credentials-from.ts      Normalize VP's embedded credentials to array
+├── flatten-presentation-results.ts  flattenPresentationResults helper + FlattenedCheckResult provenance-tagged union
+├── problem-types.ts                 ProblemTypes const map + ProblemType union (catalog of built-in ProblemDetail.type URIs)
 ├── declarations.d.ts                Ambient type declarations for untyped DCC packages
 ├── schemas/                         Zod parsing schemas
 │   ├── index.ts                     Re-exports parseCredential, parsePresentation
@@ -54,7 +56,7 @@ src/
 │   ├── proof/                       Cryptographic signature verification (dispatches to CryptoService)
 │   ├── status/                      BitstringStatusList revocation/suspension
 │   ├── registry/                    Issuer DID lookup via context.lookupIssuers
-│   └── schema/obv3/                 OBv3 JSON Schema and result-ref validation
+│   └── schema/obv3/                 OBv3 JSON Schema and result-ref validation (sibling problem-types.ts holds OBv3-specific ProblemDetail URIs, re-exported into the top-level catalog)
 ├── types/                           TypeScript type definitions
 │   ├── verifier.ts                  Verifier, VerifierConfig, VerifyCredentialCall, VerifyPresentationCall
 │   ├── options.ts                   VerifyCredentialOptions / VerifyPresentationOptions = VerifierConfig & VerifyXCall (compat aliases)
@@ -62,7 +64,7 @@ src/
 │   ├── context.ts                   VerificationContext, DocumentLoader, FetchJson
 │   ├── crypto-service.ts            CryptoService port
 │   ├── crypto-suite.ts              CryptoSuite types (legacy LDP / Data Integrity)
-│   ├── result.ts                    Result types (current + legacy)
+│   ├── result.ts                    CredentialVerificationResult / PresentationVerificationResult
 │   ├── http.ts                      HttpGetResult
 │   ├── subject.ts                   VerificationSubject
 │   ├── problem-detail.ts            ProblemDetail (RFC 9457-inspired)
@@ -123,7 +125,7 @@ test/
                  │
                  ▼
             ┌──────────┐
-            │  Report  │  { verified, credential, results: CheckResult[] }
+            │  Report  │  { verified, verifiableCredential, results: CheckResult[] }
             └──────────┘
 ```
 
@@ -163,8 +165,12 @@ in the array, so the report is always complete.
    document loader, crypto services, and registries are automatically shared across every embedded
    VC.
 
-The result is a `PresentationVerificationResult` with `presentationResults`, `credentialResults`,
-and `allResults`.
+The result is a `PresentationVerificationResult` with `verifiablePresentation` (the parsed VP),
+`presentationResults` (VP-level check results), and `credentialResults` (one
+`CredentialVerificationResult` per embedded VC). The `flattenPresentationResults` helper in
+`src/flatten-presentation-results.ts` returns a single provenance-tagged
+`FlattenedCheckResult[]` view when callers want to iterate every check that ran without losing
+which credential a check came from.
 
 ## The Verifier factory
 
@@ -180,6 +186,8 @@ Hold a `Verifier` whenever you'll perform more than one verification. The cache 
 issuer DID documents (via the `CachedResolver` baked into the document loader), DCC-legacy
 registry payloads, OIDF entity statements, and any data the registry handlers store under
 `cacheService`.
+
+Each `createVerifier()` without an explicit `cacheService` gets a fresh `InMemoryCacheService`. The default cache is no longer process-wide; two verifiers built from defaults isolate their cache contents. The default `BuiltinHttpGetService` is still memoized because the adapter itself is stateless, and the default crypto stack and bundled `securityLoader`-based document loader are also memoized for the same reason — only the cache, which holds caller-visible mutable state, is per-instance by default. To deliberately share cache state across verifiers, construct one `InMemoryCacheService` (or any `CacheService` adapter) and pass it as `createVerifier({ cacheService })` to each.
 
 ```ts
 import { createVerifier } from '@digitalcredentials/verifier-core';
@@ -283,7 +291,7 @@ VerifierConfig                       (long-lived deps: http, cache, crypto, regi
             → VerificationCheck.execute(subject, context)
               → CheckOutcome (success | failure | skip)
                 → CheckResult (suite, check, outcome, timestamp)
-        → CredentialVerificationResult                  ({ verified, credential, results })
+        → CredentialVerificationResult                  ({ verified, verifiableCredential, results })
 ```
 
 `verifyPresentation(VerifyPresentationCall)` follows the same shape, returning a
@@ -302,18 +310,49 @@ recognition VC issued by a trust authority.
 
 ## Result models
 
-The codebase has two result shapes:
+`verifyCredential` returns a `CredentialVerificationResult`:
 
-**Current** (`CredentialVerificationResult` / `PresentationVerificationResult`):
-Suite-based, using `CheckResult[]` with typed `CheckOutcome` discriminated unions. This is what
-`verifyCredential` and `verifyPresentation` return.
+```ts
+{ verified: boolean; verifiableCredential: VerifiableCredential; results: CheckResult[] }
+```
 
-**Legacy** (`VerificationResponse` / `PresentationVerificationResponse`):
-Older `log[]` / `errors[]` shape with `valid` booleans per step. Still exported from `types/result.ts`
-for backward compatibility but not produced by the current verification functions.
+`verifyPresentation` returns a `PresentationVerificationResult`:
 
-When reading tests or downstream code, look for which result shape is in use. The `CheckResult[]`
-model is the current and intended shape going forward.
+```ts
+{
+  verified: boolean;
+  verifiablePresentation: VerifiablePresentation;
+  presentationResults: CheckResult[];
+  credentialResults: CredentialVerificationResult[];
+}
+```
+
+Both shapes use the suite-based `CheckResult[]` model. Each `CheckResult` carries a discriminated
+`CheckOutcome` (`success | failure | skipped`) plus provenance (suite, check id, fatal flag,
+timestamp). The result objects are intentionally lean — no top-level flattened aggregate, no
+denormalized lists — so they remain cheap to persist (e.g. into Redis as part of a long-lived
+exchange) and to transit over the wire. Field names mirror the wire-level VC/VP property names so
+the result can be spread directly into a downstream variables object whose templates resolve
+properties by path.
+
+When a single iterable view of every check is convenient, `flattenPresentationResults(result)`
+returns a `FlattenedCheckResult[]` that tags each entry with its provenance
+(`'presentation'` or `{ source: 'credential', credentialIndex }`) — see the README for an example.
+
+### Problem-type catalog
+
+`src/problem-types.ts` exports a flat const map of every built-in `ProblemDetail.type` URI plus a
+derived `ProblemType` union. The map deliberately mixes two provenance categories: a small number
+of W3C VC Data Model 2.0 §7.1 Verification error identifiers (currently only `PARSING_ERROR`) and
+a larger number of synthesized placeholders that share the same
+`https://www.w3.org/TR/vc-data-model#…` prefix as a stable opaque key but are not defined by the
+spec. Each entry has per-token JSDoc calling out its provenance. OBv3-specific entries live in
+`src/suites/schema/obv3/problem-types.ts` and are re-exported into the top-level catalog inline
+so callers see one flat surface; when the OBv3 suite extracts to its own package, the re-export
+line drops out and the OB-specific catalog moves with the suite.
+
+`ProblemDetail.type` itself stays typed as `string` so callers writing custom suites can emit
+their own URIs without requiring an entry in the catalog.
 
 ## Dependencies
 

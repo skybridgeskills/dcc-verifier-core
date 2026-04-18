@@ -14,6 +14,7 @@
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
 - [Custom Suites](#custom-suites)
 - [Architecture](#architecture)
+- [Migration from earlier 1.0.0-beta.x](#migration-from-earlier-100-betax)
 - [Install](#install)
 - [Contribute](#contribute)
 - [License](#license)
@@ -82,19 +83,24 @@ interface VerifyCredentialOptions {
   credential: unknown;
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
+
+  // Service overrides (otherwise sensible defaults are used):
+  httpGetService?: HttpGetService;
+  cacheService?: CacheService;
+  cryptoServices?: CryptoService[];
+  registryHandlers?: RegistryHandlerMap;
   documentLoader?: DocumentLoader;
-  cryptoSuites?: CryptoSuite[];
 }
 ```
 
-Only `credential` is required. All other fields override sensible defaults (security-document-loader, Ed25519 + EdDSA crypto suites).
+Only `credential` is required. All other fields override sensible defaults (security-document-loader, Ed25519 + EdDSA crypto suites, in-memory cache). `VerifyCredentialOptions` is the type alias `VerifierConfig & VerifyCredentialCall`, so callers building the options object piece-by-piece can compose against either half.
 
 #### Result
 
 ```typescript
 interface CredentialVerificationResult {
   verified: boolean;
-  credential: VerifiableCredential;
+  verifiableCredential: VerifiableCredential;
   results: CheckResult[];
 }
 ```
@@ -125,7 +131,7 @@ interface ProblemDetail {
 ```json
 {
   "verified": true,
-  "credential": { "...parsed credential..." },
+  "verifiableCredential": { "...parsed credential..." },
   "results": [
     { "suite": "core",   "check": "core.context-exists", "outcome": { "status": "success", "message": "Credential has a valid @context property." } },
     { "suite": "core",   "check": "core.vc-context",     "outcome": { "status": "success", "message": "..." } },
@@ -194,6 +200,29 @@ All failures use `ProblemDetail` with a `type` URI. Common error types:
 | `...#ISSUER_NOT_REGISTERED` | Issuer Not Registered | Issuer DID not in any registry |
 | `...#REGISTRY_UNCHECKED` | Registry Unchecked | Some registries couldn't be reached |
 
+#### Problem types
+
+Every built-in problem URI is also exported as a constant. Branch on the const map for type-safe checks:
+
+```typescript
+import { ProblemTypes, type ProblemType } from '@digitalcredentials/verifier-core';
+
+switch (problem.type as ProblemType) {
+  case ProblemTypes.INVALID_SIGNATURE:
+    // ...
+    break;
+  case ProblemTypes.CREDENTIAL_REVOKED_OR_SUSPENDED:
+    // ...
+    break;
+  case ProblemTypes.STATUS_LIST_NOT_FOUND:
+    // ...
+    break;
+  // ...
+}
+```
+
+`ProblemDetail.type` stays typed as `string` so custom suites can emit their own problem URIs; the cast above is opt-in for callers that only need to branch on built-in types. See the per-token JSDoc on `ProblemTypes` for which entries are W3C-spec error identifiers (currently only `PARSING_ERROR`) and which are synthesized placeholders we use until a wider problem-type vocabulary is published.
+
 ### verifyPresentation
 
 ```typescript
@@ -216,19 +245,27 @@ interface VerifyPresentationOptions {
   unsignedPresentation?: boolean;
   registries?: EntityIdentityRegistry[];
   additionalSuites?: VerificationSuite[];
+
+  // Service overrides (otherwise sensible defaults are used):
+  httpGetService?: HttpGetService;
+  cacheService?: CacheService;
+  cryptoServices?: CryptoService[];
+  registryHandlers?: RegistryHandlerMap;
   documentLoader?: DocumentLoader;
-  cryptoSuites?: CryptoSuite[];
 }
 ```
+
+Like `VerifyCredentialOptions`, this is the alias `VerifierConfig & VerifyPresentationCall`.
 
 #### Result
 
 ```typescript
 interface PresentationVerificationResult {
   verified: boolean;
+  verifiablePresentation: VerifiablePresentation;
   presentationResults: CheckResult[];
   credentialResults: CredentialVerificationResult[];
-  allResults: CheckResult[];
+  // No allResults — use flattenPresentationResults(result)
 }
 ```
 
@@ -237,9 +274,32 @@ Presentation verification does two things:
 1. **Verifies the VP itself** — checks the presentation's signature (or skips if `unsignedPresentation: true`). Results go in `presentationResults`.
 2. **Verifies each embedded credential** — extracts credentials from the VP and runs `verifyCredential` on each. Results go in `credentialResults`.
 
-`verified` is `true` only if both the presentation and all embedded credentials pass. `allResults` flattens everything into a single array.
+`verified` is `true` only if both the presentation and all embedded credentials pass.
+
+The parsed VP is returned as `verifiablePresentation`, mirroring the wire-level property name so callers (and downstream systems whose templates reach into result objects by property path) can reach it without carrying the original input separately.
 
 A VP needn't be signed — it can simply package credentials together. Set `unsignedPresentation: true` to skip the VP signature check.
+
+#### Flattening results
+
+When you want a single iterable view of every check that ran across the presentation and its embedded credentials, use `flattenPresentationResults`:
+
+```typescript
+import { flattenPresentationResults } from '@digitalcredentials/verifier-core';
+
+const result = await verifyPresentation({ presentation });
+for (const entry of flattenPresentationResults(result)) {
+  if (entry.source === 'presentation') {
+    // entry.result is a CheckResult from VP-level verification
+  } else {
+    // entry.source === 'credential'
+    // entry.credentialIndex is the index into result.credentialResults
+    // entry.result is a CheckResult from that embedded VC
+  }
+}
+```
+
+Each entry preserves provenance — you always know whether a check applied to the presentation itself or to a specific embedded credential, by index.
 
 ### createVerifier (batch / repeated verification)
 
@@ -247,7 +307,9 @@ A VP needn't be signed — it can simply package credentials together. Set `unsi
 fresh verifier internally. When you'll perform more than one verification, construct a `Verifier`
 with `createVerifier(...)` and reuse it for better performance. The instance owns long-lived
 dependencies (HTTP, cache, crypto services, document loader, registries), so issuer DID documents,
-status list credentials, and JSON-LD contexts are fetched once and reused across calls. 
+status list credentials, and JSON-LD contexts are fetched once and reused across calls.
+
+Each verifier owns its own `InMemoryCacheService` by default; cache contents are isolated from other verifiers in the same process. To share cache state across verifiers, construct one cache adapter and pass it to each `createVerifier({ cacheService })`.
 
 ```typescript
 import { createVerifier } from '@digitalcredentials/verifier-core';
@@ -302,6 +364,23 @@ Custom suites run after the default suites. Each check receives the same `Verifi
 ## Architecture
 
 For internal architecture details — verification pipeline, suite model, type system, dependencies, and architectural direction — see [`docs/architecture.md`](docs/architecture.md).
+
+## Migration from earlier 1.0.0-beta.x
+
+This release tightens the public API surface. The following changes may require small migrations:
+
+- **Demoted from `index.ts`** — these symbols remain reachable via their module paths (`@digitalcredentials/verifier-core/dist/...`) but are no longer part of the published 1.0 surface: `runSuites`, `createRegistryLookup`, `DEFAULT_TTL_MS`, `parseCacheControlMaxAge`, `resolveTtl`, `ttlFromValidUntil`, `documentLoaderFromHttpGet`, `fetchJsonFromHttpGet`, `extractCredentialsFrom`, `registryKeyHash`. Most callers should build verifiers via `createVerifier(...)` rather than reach for these directly.
+
+- **Result-shape changes:**
+  - `CredentialVerificationResult.credential` → `verifiableCredential` (`s/\.credential\b/.verifiableCredential/` on accessor sites).
+  - `PresentationVerificationResult.allResults` removed — replace with `flattenPresentationResults(result)`.
+  - `PresentationVerificationResult.verifiablePresentation` added — new field carrying the parsed VP.
+
+- **Default cache isolation:** two `createVerifier()` calls without an explicit `cacheService` no longer share a process-wide cache. To preserve the previous "shared" behavior, construct one `InMemoryCacheService` and pass it to each verifier explicitly.
+
+- **Legacy result types removed:** `VerificationResponse`, `PresentationVerificationResponse`, and friends were already removed from `index.ts` in `1.0.0-beta.11`; the type definitions are now gone too. Anyone who needed the old shape can pin `1.0.0-beta.11` or earlier.
+
+- **`ProblemTypes` const map added:** built-in problem URIs are now importable as `ProblemTypes.INVALID_SIGNATURE` etc. Existing literal-string comparisons against `ProblemDetail.type` continue to work unchanged.
 
 ## Install
 
