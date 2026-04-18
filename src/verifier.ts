@@ -36,7 +36,7 @@ import type {
 import { parseCredential, VerifiableCredential } from './schemas/credential.js';
 import { parsePresentation } from './schemas/presentation.js';
 import { runSuites } from './run-suites.js';
-import { extractCredentialsFrom } from './extractCredentialsFrom.js';
+import { extractCredentialsFrom } from './extract-credentials-from.js';
 import { defaultSuites } from './default-suites.js';
 import { proofSuite } from './suites/proof/index.js';
 import {

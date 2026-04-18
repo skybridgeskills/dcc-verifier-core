@@ -55,24 +55,12 @@ export { statusSuite } from './suites/status/index.js';
 export { registrySuite } from './suites/registry/index.js';
 export { obv3SchemaSuite } from './suites/schema/index.js';
 
-// ==================== Utilities ====================
+// ==================== Extension points ====================
 
-export { runSuites } from './run-suites.js';
-export { createRegistryLookup } from './services/registry-lookup.js';
 export type {
   RegistryHandlerContext,
   RegistryHandlerMap,
   RegistryHandler,
 } from './services/registry-handlers/types.js';
-export {
-  DEFAULT_TTL_MS,
-  parseCacheControlMaxAge,
-  resolveTtl,
-  ttlFromValidUntil,
-} from './services/registry-handlers/cache-ttl.js';
-export { documentLoaderFromHttpGet } from './util/document-loader-from-http-get.js';
-export { fetchJsonFromHttpGet } from './util/fetch-json-from-http-get.js';
 export { DataIntegrityCryptoService } from './services/data-integrity-crypto.js';
 export type { DataIntegrityCryptoConfig } from './services/data-integrity-crypto.js';
-export { extractCredentialsFrom } from './extractCredentialsFrom.js';
-export { registryKeyHash } from './util/registry-key-hash.js';
