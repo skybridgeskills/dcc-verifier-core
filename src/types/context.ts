@@ -10,10 +10,10 @@
  * dependencies directly — it reads them from the context.
  */
 
-import type { CacheStore } from './cache.js';
+import type { CacheService } from '../services/cache-service/cache-service.js';
 import type { CryptoService } from './crypto-service.js';
 import type { CryptoSuite } from './crypto-suite.js';
-import type { HttpGet } from './http.js';
+import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
 import type { EntityIdentityRegistry, LookupIssuers } from './registry.js';
 
 /**
@@ -45,14 +45,14 @@ export interface VerificationContext {
   documentLoader: DocumentLoader;
   fetchJson: FetchJson;
   /**
-   * Optional unified HTTP GET (e.g. cached). When set without explicit
+   * Optional unified HTTP GET service (e.g. cached). When set without explicit
    * {@link documentLoader} / {@link fetchJson}, those are derived from this.
    */
-  httpGet?: HttpGet;
+  httpGetService?: HttpGetService;
   /**
-   * Optional cache for domain-level storage (registry handlers, etc.).
+   * Optional cache service for domain-level storage (registry handlers, etc.).
    */
-  cache?: CacheStore;
+  cacheService?: CacheService;
   /**
    * Linked Data Proof / Data Integrity suite instances for `@digitalcredentials/vc`.
    *
@@ -69,7 +69,7 @@ export interface VerificationContext {
   registries?: EntityIdentityRegistry[];
   /**
    * Optional issuer registry lookup. When omitted, the registry check uses the default
-   * adapter (phase 3).
+   * adapter.
    */
   lookupIssuers?: LookupIssuers;
   /** Expected challenge for VP authentication proof purpose. */

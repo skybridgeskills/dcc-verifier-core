@@ -2,7 +2,9 @@ import { expect } from 'chai';
 import { buildContext } from '../../../src/defaults.js';
 import { FakeCryptoService, hasDataIntegrityProof } from './fake-crypto-service.js';
 import { FakeDocumentLoader } from './fake-document-loader.js';
+import { FakeCacheService } from './fake-cache-service.js';
 import { FakeFetchJson } from './fake-fetch-json.js';
+import { FakeHttpGetService, okJsonBody } from './fake-http-get-service.js';
 import { FakeRegistryLookup } from './fake-registry-lookup.js';
 
 describe('service factories', () => {
@@ -175,5 +177,84 @@ describe('service factories', () => {
     expect(ctx.cryptoServices).to.have.lengthOf(1);
     const json = await ctx.fetchJson('https://factory.test/json');
     expect(json).to.deep.equal({ ok: true });
+  });
+
+  describe('FakeHttpGetService', () => {
+    it('returns mapped HttpGetResult', async () => {
+      const httpGetService = FakeHttpGetService({
+        'https://example.test/x': okJsonBody({ hello: 'world' }),
+      });
+      const out = await httpGetService.get('https://example.test/x');
+      expect(out.status).to.equal(200);
+      expect(out.body).to.deep.equal({ hello: 'world' });
+    });
+
+    it('throws for unmapped URLs without fallback', async () => {
+      const httpGetService = FakeHttpGetService({});
+      try {
+        await httpGetService.get('https://missing.test/x');
+        expect.fail('expected throw');
+      } catch (e) {
+        expect((e as Error).message).to.include('No fake HttpGetService');
+      }
+    });
+  });
+
+  describe('FakeCacheService', () => {
+    it('round-trips get/set', async () => {
+      const cache = FakeCacheService();
+      await cache.set('k', { a: 1 });
+      expect(await cache.get('k')).to.deep.equal({ a: 1 });
+    });
+  });
+
+  describe('buildContext with httpGetService', () => {
+    it('derives fetchJson from httpGetService', async () => {
+      const httpGetService = FakeHttpGetService({
+        'https://factory.test/json': okJsonBody({ derived: true }),
+      });
+      const ctx = buildContext({ httpGetService });
+      const json = await ctx.fetchJson('https://factory.test/json');
+      expect(json).to.deep.equal({ derived: true });
+    });
+
+    it('keeps explicit fetchJson when httpGetService is also set', async () => {
+      const httpGetService = FakeHttpGetService({
+        'https://factory.test/json': okJsonBody({ fromHttp: true }),
+      });
+      const ctx = buildContext({
+        httpGetService,
+        fetchJson: FakeFetchJson({ 'https://factory.test/json': { fromExplicit: true } }),
+      });
+      const json = await ctx.fetchJson('https://factory.test/json');
+      expect(json).to.deep.equal({ fromExplicit: true });
+    });
+
+    it('keeps explicit documentLoader when httpGetService is also set', async () => {
+      const doc = { '@context': ['https://example.test/ctx'], id: 'urn:explicit' };
+      const httpGetService = FakeHttpGetService({
+        'https://example.test/remote': okJsonBody({ wrong: true }),
+      });
+      const ctx = buildContext({
+        httpGetService,
+        documentLoader: FakeDocumentLoader({ 'https://example.test/remote': doc }),
+      });
+      const out = (await ctx.documentLoader('https://example.test/remote')) as {
+        document: unknown;
+      };
+      expect(out.document).to.deep.equal(doc);
+    });
+
+    it('passes cacheService through on context', () => {
+      const cacheService = FakeCacheService();
+      const ctx = buildContext({ cacheService });
+      expect(ctx.cacheService).to.equal(cacheService);
+    });
+
+    it('sets effective httpGetService on context when caller omits it', () => {
+      const ctx = buildContext({});
+      expect(ctx.httpGetService).to.be.an('object');
+      expect(typeof ctx.httpGetService?.get).to.equal('function');
+    });
   });
 });

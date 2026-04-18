@@ -13,11 +13,15 @@ import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
 import { securityLoader } from '@digitalcredentials/security-document-loader';
 import { DataIntegrityCryptoService } from './services/data-integrity-crypto.js';
-import { defaultLookupIssuers } from './services/registry-lookup.js';
+import { createRegistryLookup } from './services/registry-lookup.js';
+import type { CryptoService } from './types/crypto-service.js';
 import { CryptoSuite } from './types/crypto-suite.js';
 import { VerificationContext, FetchJson } from './types/context.js';
+import { BuiltinHttpGetService } from './services/http-get-service/builtin-http-get-service.js';
 import { VerificationSuite } from './types/check.js';
-import type { CryptoService } from './types/crypto-service.js';
+import { documentLoaderFromHttpGet } from './util/document-loader-from-http-get.js';
+import { fetchJsonFromHttpGet } from './util/fetch-json-from-http-get.js';
+import { InMemoryCacheService } from './services/cache-service/in-memory-cache-service.js';
 
 import { coreSuite } from './suites/core/index.js';
 import { proofSuite } from './suites/proof/index.js';
@@ -40,15 +44,22 @@ export const defaultDocumentLoader = securityLoader({ fetchRemoteContexts: true 
 /**
  * Default plain-JSON fetcher (AJV schema load, future OIDF/OIDC/JWKS).
  *
- * Uses the global `fetch` API. Not used for JSON-LD — see {@link defaultDocumentLoader}.
+ * Uses a default {@link BuiltinHttpGetService}. Not used for JSON-LD — see {@link defaultDocumentLoader}.
  */
 export const defaultFetchJson: FetchJson = async (url: string) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
+  const httpGetService = BuiltinHttpGetService();
+  const { body, status } = await httpGetService.get(url);
+  if (status < 200 || status >= 300) {
+    throw new Error(`Failed to fetch ${url}: HTTP ${status}`);
   }
-  return response.json();
+  return body;
 };
+
+/** Default {@link BuiltinHttpGetService} instance. */
+export const defaultHttpGetService = BuiltinHttpGetService();
+
+/** Default {@link InMemoryCacheService} instance. */
+export const defaultCacheService = InMemoryCacheService();
 
 /**
  * Default crypto suites for signature verification.
@@ -94,20 +105,39 @@ export const defaultSuites: VerificationSuite[] = [
  * const ctx = buildContext({ registries: myRegistries });
  * ```
  */
-export { defaultLookupIssuers };
+export { createRegistryLookup, defaultLookupIssuers } from './services/registry-lookup.js';
 
 export function buildContext(overrides?: Partial<VerificationContext>): VerificationContext {
   const cryptoSuites = overrides?.cryptoSuites ?? defaultCryptoSuites;
   const cryptoServices =
     overrides?.cryptoServices ?? [DataIntegrityCryptoService({ suites: cryptoSuites })];
 
+  const effectiveHttpGetService = overrides?.httpGetService ?? BuiltinHttpGetService();
+  const effectiveCacheService = overrides?.cacheService ?? InMemoryCacheService();
+
+  const httpGetServiceOverride = overrides?.httpGetService;
+  const documentLoader =
+    overrides?.documentLoader ??
+    (httpGetServiceOverride !== undefined
+      ? documentLoaderFromHttpGet(httpGetServiceOverride)
+      : defaultDocumentLoader);
+
+  const fetchJson =
+    overrides?.fetchJson ??
+    (httpGetServiceOverride !== undefined
+      ? fetchJsonFromHttpGet(httpGetServiceOverride)
+      : defaultFetchJson);
+
   return {
-    documentLoader: overrides?.documentLoader ?? defaultDocumentLoader,
-    fetchJson: overrides?.fetchJson ?? defaultFetchJson,
+    documentLoader,
+    fetchJson,
+    httpGetService: effectiveHttpGetService,
+    cacheService: effectiveCacheService,
     cryptoSuites,
     cryptoServices,
     registries: overrides?.registries,
-    lookupIssuers: overrides?.lookupIssuers ?? defaultLookupIssuers,
+    lookupIssuers:
+      overrides?.lookupIssuers ?? createRegistryLookup(effectiveHttpGetService, effectiveCacheService),
     challenge: overrides?.challenge ?? null,
     unsignedPresentation: overrides?.unsignedPresentation ?? false,
     verifyBitstringStatusListCredential:

@@ -7,10 +7,10 @@
  * `buildContext()` before checks run.
  */
 
-import { VerificationSuite } from './check.js';
-import type { CacheStore } from './cache.js';
+import type { VerificationSuite } from './check.js';
+import type { CacheService } from '../services/cache-service/cache-service.js';
 import type { DocumentLoader, FetchJson } from './context.js';
-import type { HttpGet } from './http.js';
+import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
 import type { CryptoService } from './crypto-service.js';
 import type { CryptoSuite } from './crypto-suite.js';
 import type { EntityIdentityRegistry, LookupIssuers } from './registry.js';
@@ -46,21 +46,21 @@ export interface VerifyCredentialOptions {
   fetchJson?: FetchJson;
 
   /**
-   * Unified HTTP GET. When set without {@link documentLoader} / {@link fetchJson},
+   * Unified HTTP GET service. When set without {@link documentLoader} / {@link fetchJson},
    * those are derived from this in `buildContext()`.
    */
-  httpGet?: HttpGet;
+  httpGetService?: HttpGetService;
 
-  /** Domain cache (registry lookups, etc.). */
-  cache?: CacheStore;
+  /** Domain cache service (registry lookups, etc.). */
+  cacheService?: CacheService;
 
   /** Custom crypto suites for signature verification */
   cryptoSuites?: CryptoSuite[];
 
-  /** Pluggable crypto services (phase 2; optional today) */
+  /** Pluggable crypto services */
   cryptoServices?: CryptoService[];
 
-  /** Custom registry lookup (phase 3; optional today) */
+  /** Custom registry lookup */
   lookupIssuers?: LookupIssuers;
 }
 
@@ -98,18 +98,18 @@ export interface VerifyPresentationOptions {
   /** Plain JSON fetcher (defaults to fetch + json(); used by OBv3 schema after phase 3) */
   fetchJson?: FetchJson;
 
-  /** @see {@link VerifyCredentialOptions.httpGet} */
-  httpGet?: HttpGet;
+  /** @see {@link VerifyCredentialOptions.httpGetService} */
+  httpGetService?: HttpGetService;
 
-  /** @see {@link VerifyCredentialOptions.cache} */
-  cache?: CacheStore;
+  /** @see {@link VerifyCredentialOptions.cacheService} */
+  cacheService?: CacheService;
 
   /** Custom crypto suites for signature verification */
   cryptoSuites?: CryptoSuite[];
 
-  /** Pluggable crypto services (phase 2; optional today) */
+  /** Pluggable crypto services */
   cryptoServices?: CryptoService[];
 
-  /** Custom registry lookup (phase 3; optional today) */
+  /** Custom registry lookup */
   lookupIssuers?: LookupIssuers;
 }

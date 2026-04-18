@@ -69,9 +69,20 @@ export interface RegistryLookupResult {
 }
 
 /**
+ * Options for {@link LookupIssuers}.
+ */
+export interface LookupIssuersOptions {
+  /** When true, skip cached results and perform a fresh lookup. */
+  fresh?: boolean;
+  /** When true, check all registries even after finding a match. */
+  exhaustive?: boolean;
+}
+
+/**
  * Looks up whether an issuer DID is registered in the configured registries.
  */
 export type LookupIssuers = (
   did: string,
-  registries: EntityIdentityRegistry[]
+  registries: EntityIdentityRegistry[],
+  options?: LookupIssuersOptions,
 ) => Promise<RegistryLookupResult>;
