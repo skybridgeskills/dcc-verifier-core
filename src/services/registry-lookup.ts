@@ -32,12 +32,19 @@ const defaultHandlers: RegistryHandlerMap = {
 
 /**
  * Build a {@link LookupIssuers} using `httpGetService`, `cacheService`,
- * optional per-type `handlers`, and an optional `verifier`.
+ * optional per-type `handlers`, and an optional `getVerifier` thunk.
  *
- * The `verifier` is threaded through to handlers via
- * {@link RegistryHandlerContext} — required by the `vc-recognition`
- * handler so it can recursively verify the recognition credential. If
- * not provided, vc-recognition lookups will throw a clear error when
+ * The `getVerifier` thunk is called per handler invocation to obtain
+ * the parent {@link Verifier}, which is threaded through to handlers
+ * via {@link RegistryHandlerContext} — required by the `vc-recognition`
+ * handler so it can recursively verify the recognition credential. The
+ * thunk indirection resolves the chicken-and-egg between
+ * `createVerifier` (needs `lookupIssuers` for context) and
+ * `createRegistryLookup` (wants the verifier for handlers): the verifier
+ * is forward-declared in `createVerifier` and the thunk closes over the
+ * mutable reference.
+ *
+ * If not provided, vc-recognition lookups will throw a clear error when
  * invoked. `dcc-legacy` and `oidf` handlers do not use the verifier and
  * work fine without one.
  *
@@ -53,7 +60,7 @@ export function createRegistryLookup(
   httpGetService: HttpGetService,
   cacheService: CacheService,
   handlers: RegistryHandlerMap = defaultHandlers,
-  verifier?: Verifier,
+  getVerifier?: () => Verifier,
 ): LookupIssuers {
   return async (
     did: string,
@@ -73,10 +80,10 @@ export function createRegistryLookup(
       httpGetService,
       cacheService,
       get verifier(): Verifier {
-        if (verifier === undefined) {
+        if (getVerifier === undefined) {
           throwUnboundVerifier();
         }
-        return verifier;
+        return getVerifier();
       },
     };
 

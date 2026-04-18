@@ -2,7 +2,6 @@ import { VerificationCheck, CheckOutcome } from '../../types/check.js';
 import { ProblemDetail } from '../../types/problem-detail.js';
 import { VerificationSubject } from '../../types/subject.js';
 import { VerificationContext } from '../../types/context.js';
-import { defaultLookupIssuers } from '../../services/registry-lookup.js';
 
 /**
  * Extract issuer DID from credential.
@@ -27,11 +26,13 @@ function getIssuerDid(credential: Record<string, unknown>): string | undefined {
  * Looks up the credential's issuer DID in known DID registries to determine
  * if the issuer is trusted/registered. This is a non-fatal informational check.
  *
- * Uses {@link VerificationContext.lookupIssuers} when set; otherwise
- * {@link defaultLookupIssuers}.
+ * Requires {@link VerificationContext.lookupIssuers} to be set — the
+ * `Verifier` factory always populates it. Hand-built contexts that omit
+ * it cause this check to skip.
  *
  * Skipped when:
  * - No registries provided in VerificationContext
+ * - No `lookupIssuers` in VerificationContext
  *
  * Success when:
  * - Issuer found in at least one registry
@@ -79,7 +80,13 @@ export const issuerRegistryCheck: VerificationCheck = {
       };
     }
 
-    const lookupIssuers = context.lookupIssuers ?? defaultLookupIssuers;
+    const lookupIssuers = context.lookupIssuers;
+    if (!lookupIssuers) {
+      return {
+        status: 'skipped',
+        reason: 'No lookupIssuers in verification context.',
+      };
+    }
 
     try {
       const result = await lookupIssuers(issuerDid, context.registries);

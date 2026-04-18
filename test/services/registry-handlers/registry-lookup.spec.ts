@@ -322,7 +322,7 @@ describe('createRegistryLookup', () => {
         FakeHttpGetService({}),
         FakeCacheService(),
         handlers,
-        fakeVerifier,
+        () => fakeVerifier,
       );
       await lookup('did:key:test', [dccRegistry]);
       expect(receivedVerifier).to.equal(fakeVerifier);

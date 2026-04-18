@@ -56,9 +56,12 @@ export interface VerificationContext {
   /**
    * Linked Data Proof / Data Integrity suite instances for `@digitalcredentials/vc`.
    *
-   * Mirrored into the default {@link cryptoServices} entry by `buildContext()`. Callers may
-   * override {@link cryptoServices} alone; this field stays in sync when only `cryptoSuites`
-   * is overridden.
+   * @internal Slated for removal. Currently still consumed by
+   * `bitstring-status-check`, which passes the concrete suite instances
+   * to the third-party `checkStatus` function from
+   * `@digitalcredentials/vc-bitstring-status-list`. A follow-up phase
+   * will refactor that check (e.g. recursively verify the status list
+   * credential via `Verifier.verifyCredential`) and drop this field.
    */
   cryptoSuites: CryptoSuite[];
   /**
@@ -79,6 +82,11 @@ export interface VerificationContext {
   /**
    * When true (default), verify the BitstringStatusListCredential proof before reading
    * revocation bits. Set false for tests with unsigned list credentials from factories.
+   *
+   * @internal Slated for removal alongside {@link cryptoSuites} when
+   * `bitstring-status-check` is refactored. Not exposed via
+   * `VerifierConfig` or `VerifyXCall` — only consumed by tests that
+   * build a {@link VerificationContext} directly.
    */
   verifyBitstringStatusListCredential?: boolean;
 }
