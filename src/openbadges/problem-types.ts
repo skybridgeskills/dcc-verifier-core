@@ -48,6 +48,19 @@ export const Obv3ProblemTypes = {
    */
   OB_MISSING_RESULT_STATUS:
     'https://www.w3.org/TR/vc-data-model#OB_MISSING_RESULT_STATUS',
+
+  /**
+   * Synthesized — an `achievement.achievementType` value is neither
+   * in the OBv3 built-in `AchievementType` vocabulary nor a
+   * caller-supplied augment, and does not use the reserved `ext:`
+   * extension prefix.
+   *
+   * Spec anchor: OBv3 §6 / §B.1.1 (`AchievementType` enumeration);
+   * the `ext:` prefix carve-out is the spec-sanctioned path for
+   * issuer-defined extensions.
+   */
+  OB_UNKNOWN_ACHIEVEMENT_TYPE:
+    'https://www.w3.org/TR/vc-data-model#OB_UNKNOWN_ACHIEVEMENT_TYPE',
 } as const;
 
 export type Obv3ProblemType =

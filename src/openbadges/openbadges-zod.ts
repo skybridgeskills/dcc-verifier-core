@@ -58,7 +58,15 @@ export const Obv3ResultShape = z
 
 export const Obv3AchievementShape = z
   .object({
-    achievementType: z.union([z.string(), z.array(z.string())]).optional(),
+    /**
+     * Spec shape is `string | string[]`, but we model as `unknown`
+     * for tolerance — the unknown-achievement-type check ignores
+     * non-string entries by design (shape validity is a separate
+     * concern), and modeling strictly here would cause one bad
+     * entry to fail the entire `safeParse` and silently skip the
+     * whole check.
+     */
+    achievementType: z.unknown(),
     resultDescription: z.array(Obv3ResultDescriptionShape).optional(),
   })
   .passthrough();
