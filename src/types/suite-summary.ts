@@ -15,6 +15,7 @@
  */
 
 import type { SuitePhase } from './check.js';
+import type { TaskTiming } from './timing.js';
 
 /**
  * Phase tag as it appears on a `SuiteSummary`.
@@ -84,4 +85,21 @@ export interface SuiteSummary {
    * actually executed before the halt.
    */
   fatalFailureAt?: string;
+
+  /**
+   * Suite-level timing rolled up from the child checks. Only
+   * present when the producing call ran with `timing: true`.
+   *
+   *  - `startedAt` is the earliest child `timing.startedAt`.
+   *  - `endedAt`   is the latest child `timing.endedAt`.
+   *  - `durationMs` is the sum of child `timing.durationMs`
+   *    (CPU/wall time spent inside checks; tighter than
+   *    `endedAt - startedAt`, which would also include any
+   *    inter-check gap).
+   *
+   * Survives result folding: even when `verbose: false` hides
+   * individual check details, this rollup is computed before
+   * checks are folded away. See {@link TaskTiming}.
+   */
+  timing?: TaskTiming;
 }

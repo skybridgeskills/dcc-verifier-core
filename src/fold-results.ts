@@ -34,6 +34,7 @@ import type {
   SuiteSummary,
   SuiteSummaryPhase,
 } from './types/suite-summary.js';
+import type { TaskTiming } from './types/timing.js';
 
 export interface FoldOptions {
   /**
@@ -167,6 +168,8 @@ function summarizeSuite(
     pickAppliesSkipReason(suiteChecks, suiteId),
   );
 
+  const timing = rollupSuiteTiming(suiteChecks);
+
   return {
     id: computeId(phase, suiteId, ''),
     phase: phase ?? 'unknown',
@@ -176,7 +179,46 @@ function summarizeSuite(
     message,
     counts,
     ...(fatalFailureAt !== undefined ? { fatalFailureAt } : {}),
+    ...(timing !== undefined ? { timing } : {}),
   };
+}
+
+/**
+ * Roll a suite's child-check timings into a single
+ * suite-level {@link TaskTiming}, or return `undefined` when
+ * none of the children carried `timing` (i.e. the call ran
+ * without `timing: true`).
+ *
+ *  - `startedAt` = earliest child `startedAt` (lex-min of ISO
+ *    strings, which is correct because all are UTC `Z`-suffixed).
+ *  - `endedAt`   = latest child `endedAt`.
+ *  - `durationMs` = sum of child `durationMs`. The summed-CPU
+ *    semantic is intentional: it is what consumers actually
+ *    want when comparing suite cost — `endedAt - startedAt`
+ *    would also include any inter-check gap (e.g. event-loop
+ *    yields in the orchestrator), which is not part of the
+ *    suite's own work.
+ *
+ * Computed before checks are folded out of `results[]`, so the
+ * rollup survives `verbose: false` consumers.
+ */
+function rollupSuiteTiming(
+  suiteChecks: CheckResult[],
+): TaskTiming | undefined {
+  const timed = suiteChecks
+    .map(c => c.timing)
+    .filter((t): t is TaskTiming => t !== undefined);
+  if (timed.length === 0) return undefined;
+
+  let startedAt = timed[0].startedAt;
+  let endedAt = timed[0].endedAt;
+  let durationMs = 0;
+  for (const t of timed) {
+    if (t.startedAt < startedAt) startedAt = t.startedAt;
+    if (t.endedAt > endedAt) endedAt = t.endedAt;
+    durationMs += t.durationMs;
+  }
+  return { startedAt, endedAt, durationMs };
 }
 
 function deriveStatus(counts: {

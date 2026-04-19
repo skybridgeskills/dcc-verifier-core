@@ -14,6 +14,7 @@ import type { CacheService } from '../services/cache-service/cache-service.js';
 import type { CryptoService } from './crypto-service.js';
 import type { CryptoSuite } from './crypto-suite.js';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
+import type { TimeService } from '../services/time-service/time-service.js';
 import type { EntityIdentityRegistry, LookupIssuers } from './registry.js';
 import type { RecognizerSpec } from './recognition.js';
 
@@ -97,4 +98,26 @@ export interface VerificationContext {
    * verifier factory directly.
    */
   recognizers?: RecognizerSpec[];
+  /**
+   * Pluggable wall-clock + monotonic clock. Required at
+   * runtime — `createVerifier(...)` populates a default
+   * {@link RealTimeService} when no override is supplied on
+   * {@link VerifierConfig}. Marked optional here only so test
+   * factories that build a {@link VerificationContext}
+   * directly remain backward-compatible during the rollout
+   * of timing instrumentation; production code paths must
+   * always set it.
+   *
+   * @see ../services/time-service/time-service.ts
+   */
+  timeService?: TimeService;
+  /**
+   * When true, every `CheckResult` produced under this
+   * context carries `timing`, and top-level / suite-level
+   * timing rolls up. Resolved by `createVerifier(...)` from
+   * `VerifierConfig.timing` and per-call overrides; checks
+   * never read this directly — only `runSuites` and
+   * `verifier.ts` do.
+   */
+  timing?: boolean;
 }

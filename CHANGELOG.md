@@ -21,6 +21,25 @@ remains available via `verbose: true` on the verifier or per call.
 - New consumer doc at `docs/api/verification-results.md` covering the
   folded shape, the `id` namespace, a UI rendering recipe, and a
   prompt-ready appendix for downstream UIs.
+- `timing?: boolean` flag on `VerifierConfig`,
+  `VerifyCredentialCall`, and `VerifyPresentationCall`. When true,
+  every `CheckResult`, every `SuiteSummary`, and every top-level
+  `Credential|PresentationVerificationResult` carries a
+  `timing: TaskTiming` field describing wall-clock start/end and
+  monotonic duration. Mirrors the `verbose` flag's plumbing; per-call
+  wins; propagates from `verifyPresentation` into embedded
+  `verifyCredential` calls. See `docs/api/timing.md`.
+- `TaskTiming` interface (`startedAt`, `endedAt`, `durationMs`,
+  optional recursive `events`). The reserved `events` field is
+  forward-compatible with future sub-event capture from inside a
+  single check.
+- `TimeService` interface plus `RealTimeService` and `FakeTimeService`
+  factories. New optional `timeService` on `VerifierConfig` (defaults
+  to `RealTimeService()`). Now available on
+  `VerificationContext.timeService` for any future check that needs to
+  ask "what time is it?" — useful groundwork for credential
+  expiration, signature clock-skew, key rotation, and status-list
+  freshness work.
 
 ### Changed
 

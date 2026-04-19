@@ -8,6 +8,9 @@
 > **Audience.** UI/integration teams building on top of `verifier-core`,
 > primarily `dcc-transaction-service`. The §8 prompt-ready appendix is
 > written to be copy-pasted as the seed of an LLM prompt.
+>
+> **See also.** For per-check / per-suite / per-call timing data
+> on every result, see [`timing.md`](./timing.md).
 
 ## Table of Contents
 
@@ -65,7 +68,7 @@ The same verification with `verbose: true`:
     { "id": "cryptographic.core.context-exists",
       "suite": "core", "check": "core.context-exists",
       "outcome": { "status": "success", "message": "..." },
-      "timestamp": "2026-04-18T...", "fatal": true },
+      "fatal": true },
     { "id": "cryptographic.core.vc-context",      /* ... */ },
     { "id": "cryptographic.core.credential-id",   /* ... */ },
     { "id": "cryptographic.core.proof-exists",    /* ... */ },
@@ -412,7 +415,7 @@ dcc-transaction-service UI implementation.
               "title": "Issuer Not Registered",
               "detail": "Issuer DID not in any registry." }
           ]},
-          "timestamp": "2026-04-18T...", "fatal": false }
+          "fatal": false }
       ],
       "summary": [
         { "id": "cryptographic.core",  "phase": "cryptographic",

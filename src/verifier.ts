@@ -61,9 +61,12 @@ import {
   defaultDocumentLoaderFor,
 } from './default-services.js';
 import { createRegistryLookup } from './services/registry-lookup.js';
+import { RealTimeService } from './services/time-service/real-time-service.js';
+import type { TimeService } from './services/time-service/time-service.js';
 import { fetchJsonFromHttpGet } from './util/fetch-json-from-http-get.js';
 import type { ProblemDetail } from './types/problem-detail.js';
 import type { EntityIdentityRegistry } from './types/registry.js';
+import type { TaskTiming } from './types/timing.js';
 import { ProblemTypes } from './problem-types.js';
 
 export function createVerifier(config: VerifierConfig = {}): Verifier {
@@ -76,6 +79,8 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
   const recognizers = config.recognizers ?? [];
   const constructorPhases = config.phases;
   const constructorVerbose = config.verbose;
+  const constructorTiming = config.timing;
+  const timeService: TimeService = config.timeService ?? RealTimeService();
 
   // Forward-declared verifier reference. The lookupIssuers thunk closes
   // over this slot so handlers can recursively call back into the
@@ -96,9 +101,19 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
   const verifier: Verifier = {
     verifyCredential: async (call: VerifyCredentialCall) => {
+      const timing = call.timing ?? constructorTiming ?? false;
+      const topLevel = timing
+        ? startTopLevelTiming(timeService)
+        : undefined;
+
       const parseResult = parseCredential(call.credential);
       if (!parseResult.success) {
-        return parseFailureCredentialResult(call.credential, parseResult.error);
+        const result = parseFailureCredentialResult(
+          call.credential,
+          parseResult.error,
+          timing ? timeService : undefined,
+        );
+        return finalizeCredentialResult(result, topLevel, timeService);
       }
       const parsedCredential = parseResult.data;
 
@@ -111,6 +126,8 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         lookupIssuers,
         registries: call.registries ?? constructorRegistries,
         recognizers,
+        timeService,
+        timing,
       });
 
       const additionalSuites = call.additionalSuites ?? [];
@@ -128,14 +145,8 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         { explicitSuiteIds, phases: effectivePhases },
       );
 
-      // Lift recognition payload before folding so the lifted form
-      // survives even when the recognition CheckResult is folded
-      // away in non-verbose mode.
       const recognized = extractRecognition(rawChecks);
 
-      // Populate `id` on every check before folding so the per-check
-      // `id` and the matching `SuiteSummary.id` derive from one
-      // computation. Verbose-mode consumers also see `id`.
       populateCheckIds(rawChecks, suites);
 
       const verbose =
@@ -151,13 +162,23 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         summary: folded.summaries,
       };
       if (requestedPhases !== undefined) result.partial = true;
-      return result;
+      return finalizeCredentialResult(result, topLevel, timeService);
     },
 
     verifyPresentation: async (call: VerifyPresentationCall) => {
+      const timing = call.timing ?? constructorTiming ?? false;
+      const topLevel = timing
+        ? startTopLevelTiming(timeService)
+        : undefined;
+
       const parseResult = parsePresentation(call.presentation);
       if (!parseResult.success) {
-        return parseFailurePresentationResult(call.presentation, parseResult.error);
+        const result = parseFailurePresentationResult(
+          call.presentation,
+          parseResult.error,
+          timing ? timeService : undefined,
+        );
+        return finalizePresentationResult(result, topLevel, timeService);
       }
       const parsedPresentation = parseResult.data;
 
@@ -172,6 +193,8 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         recognizers,
         challenge: call.challenge ?? null,
         unsignedPresentation: call.unsignedPresentation ?? false,
+        timeService,
+        timing,
       });
 
       const additionalSuites = call.additionalSuites ?? [];
@@ -207,16 +230,15 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
             await verifier.verifyCredential({
               credential,
               additionalSuites: call.additionalSuites,
-              // Forward override only; if undefined, the constructor
-              // default reapplies inside the recursive call.
               registries: call.registries,
               phases: call.phases,
-              // Propagate explicitly so embedded credentials use the
-              // same verbosity as this presentation call (otherwise
-              // the recursive call would re-evaluate from
-              // constructorVerbose, which usually matches but can
-              // diverge if the per-call `verbose` overrode it here).
               verbose,
+              // Propagate explicitly so embedded credentials inherit
+              // the presentation-level decision; otherwise the
+              // recursive call would re-evaluate from
+              // `constructorTiming` (usually matches, but diverges
+              // when the per-call `timing` overrode it here).
+              timing,
             }),
           );
         }
@@ -233,7 +255,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         summary: foldedPresentation.summaries,
       };
       if (requestedPhases !== undefined) result.partial = true;
-      return result;
+      return finalizePresentationResult(result, topLevel, timeService);
     },
   };
 
@@ -252,6 +274,8 @@ interface BuildContextInput {
   recognizers?: RecognizerSpec[];
   challenge?: string | null;
   unsignedPresentation?: boolean;
+  timeService: TimeService;
+  timing: boolean;
 }
 
 /**
@@ -274,6 +298,8 @@ function buildContext(input: BuildContextInput): VerificationContext {
     lookupIssuers: input.lookupIssuers,
     challenge: input.challenge ?? null,
     unsignedPresentation: input.unsignedPresentation ?? false,
+    timeService: input.timeService,
+    timing: input.timing,
   };
 }
 
@@ -358,15 +384,34 @@ const PARSING_SUITE: VerificationSuite = {
   ],
 };
 
-function parseErrorResult(problem: ProblemDetail): CheckResult {
+function parseErrorResult(
+  problem: ProblemDetail,
+  timeService: TimeService | undefined,
+): CheckResult {
   const result: CheckResult = {
     suite: 'parsing',
     check: 'parsing.envelope',
     outcome: { status: 'failure', problems: [problem] },
-    timestamp: new Date().toISOString(),
     fatal: true,
   };
   result.id = computeId(PARSING_SUITE.phase, 'parsing', 'parsing.envelope');
+  if (timeService !== undefined) {
+    // Parse failures short-circuit before any check runs, so the
+    // synthetic `parsing.envelope` check is the only thing the
+    // result carries. Sample both clocks twice so the produced
+    // `TaskTiming` reflects the cost of recording the failure
+    // and so suite-level rollup math (sum of child durations)
+    // works the same way it does for normal runs.
+    const startedDateMs = timeService.dateNowMs();
+    const startedMonoMs = timeService.performanceNowMs();
+    const endedDateMs = timeService.dateNowMs();
+    const endedMonoMs = timeService.performanceNowMs();
+    result.timing = {
+      startedAt: new Date(startedDateMs).toISOString(),
+      endedAt: new Date(endedDateMs).toISOString(),
+      durationMs: endedMonoMs - startedMonoMs,
+    };
+  }
   return result;
 }
 
@@ -376,6 +421,11 @@ function parseErrorResult(problem: ProblemDetail): CheckResult {
  * so the summary always has `status: 'failure'`,
  * `verified: false`. We surface the parse error in `results[]`
  * regardless of `verbose` (a parse error is unusable without it).
+ *
+ * Folds in `verbose: true` so the parse-error check survives;
+ * `foldCheckResults` rolls per-check timing into the summary, so
+ * the suite-level `timing` propagates here too when the call ran
+ * with `timing: true`.
  */
 function parseErrorSummary(check: CheckResult): SuiteSummary[] {
   const folded = foldCheckResults([check], [PARSING_SUITE], { verbose: true });
@@ -385,13 +435,14 @@ function parseErrorSummary(check: CheckResult): SuiteSummary[] {
 function parseFailureCredentialResult(
   credential: unknown,
   error: { errors: Array<{ path: Array<string | number>; message: string }> },
+  timeService: TimeService | undefined,
 ): CredentialVerificationResult {
   const problem: ProblemDetail = {
     type: ProblemTypes.PARSING_ERROR,
     title: 'Credential Parsing Failed',
     detail: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
   };
-  const check = parseErrorResult(problem);
+  const check = parseErrorResult(problem, timeService);
   return {
     verified: false,
     verifiableCredential: credential as VerifiableCredential,
@@ -403,13 +454,14 @@ function parseFailureCredentialResult(
 function parseFailurePresentationResult(
   presentation: unknown,
   error: { errors: Array<{ path: Array<string | number>; message: string }> },
+  timeService: TimeService | undefined,
 ): PresentationVerificationResult {
   const problem: ProblemDetail = {
     type: ProblemTypes.PARSING_ERROR,
     title: 'Presentation Parsing Failed',
     detail: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
   };
-  const check = parseErrorResult(problem);
+  const check = parseErrorResult(problem, timeService);
   return {
     verified: false,
     verifiablePresentation: presentation as VerifiablePresentation,
@@ -417,4 +469,65 @@ function parseFailurePresentationResult(
     credentialResults: [],
     summary: parseErrorSummary(check),
   };
+}
+
+interface InProgressTopLevelTiming {
+  startedAt: string;
+  startedMonoMs: number;
+}
+
+/**
+ * Sample both clocks at the very top of a `verifyCredential` /
+ * `verifyPresentation` call so {@link finalizeCredentialResult}
+ * and {@link finalizePresentationResult} can produce an
+ * inclusive `TaskTiming` that wraps every check (including
+ * recursive `verifyCredential` invocations on embedded VCs in
+ * the presentation case).
+ */
+function startTopLevelTiming(
+  timeService: TimeService,
+): InProgressTopLevelTiming {
+  return {
+    startedAt: new Date(timeService.dateNowMs()).toISOString(),
+    startedMonoMs: timeService.performanceNowMs(),
+  };
+}
+
+/**
+ * Close out a top-level timing started with
+ * {@link startTopLevelTiming}, sampling both clocks at the
+ * moment the result is about to be returned. `endedAt` /
+ * `durationMs` therefore reflect the entire body of the call.
+ */
+function finishTopLevelTiming(
+  started: InProgressTopLevelTiming,
+  timeService: TimeService,
+): TaskTiming {
+  return {
+    startedAt: started.startedAt,
+    endedAt: new Date(timeService.dateNowMs()).toISOString(),
+    durationMs: timeService.performanceNowMs() - started.startedMonoMs,
+  };
+}
+
+function finalizeCredentialResult(
+  result: CredentialVerificationResult,
+  topLevel: InProgressTopLevelTiming | undefined,
+  timeService: TimeService,
+): CredentialVerificationResult {
+  if (topLevel !== undefined) {
+    result.timing = finishTopLevelTiming(topLevel, timeService);
+  }
+  return result;
+}
+
+function finalizePresentationResult(
+  result: PresentationVerificationResult,
+  topLevel: InProgressTopLevelTiming | undefined,
+  timeService: TimeService,
+): PresentationVerificationResult {
+  if (topLevel !== undefined) {
+    result.timing = finishTopLevelTiming(topLevel, timeService);
+  }
+  return result;
 }

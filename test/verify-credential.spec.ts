@@ -247,14 +247,54 @@ describe('verifyCredential', () => {
       }
     });
 
-    it('results have timestamps', async () => {
+  });
+
+  describe('timing flag (presence/absence)', () => {
+    it('omits timing on every result by default', async () => {
       const credential = CredentialFactory({ version: 'v1', credential: {} });
       const result = await verifyCredential({ credential, ...fakeVerified });
 
-      for (const checkResult of result.results) {
-        expect(checkResult.timestamp).to.be.a('string');
-        expect(new Date(checkResult.timestamp).getTime()).to.be.a('number');
+      expect(result.timing).to.equal(undefined);
+      for (const c of result.results) expect(c.timing).to.equal(undefined);
+      for (const s of result.summary) expect(s.timing).to.equal(undefined);
+    });
+
+    it('populates timing on every result when timing: true', async () => {
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const result = await verifyCredential({
+        credential,
+        ...fakeVerified,
+        timing: true,
+      });
+
+      expect(result.timing).to.exist;
+      expect(result.timing!.startedAt).to.be.a('string');
+      expect(result.timing!.endedAt).to.be.a('string');
+      expect(result.timing!.durationMs).to.be.at.least(0);
+
+      expect(result.results.length).to.be.greaterThan(0);
+      for (const c of result.results) {
+        expect(c.timing, `check ${c.id} missing timing`).to.exist;
+        expect(c.timing!.startedAt).to.be.a('string');
+        expect(c.timing!.endedAt).to.be.a('string');
+        expect(c.timing!.durationMs).to.be.at.least(0);
       }
+      for (const s of result.summary) {
+        expect(s.timing, `suite ${s.id} missing timing`).to.exist;
+      }
+    });
+
+    it('populates timing even when parsing fails', async () => {
+      const result = await verifyCredential({
+        credential: 'not a credential',
+        timing: true,
+      });
+
+      expect(result.timing).to.exist;
+      expect(result.results).to.have.lengthOf(1);
+      expect(result.results[0].timing).to.exist;
+      expect(result.summary).to.have.lengthOf(1);
+      expect(result.summary[0].timing).to.exist;
     });
   });
 

@@ -1,5 +1,6 @@
 import { CheckResult } from './check.js';
 import { SuiteSummary } from './suite-summary.js';
+import type { TaskTiming } from './timing.js';
 import { VerifiableCredential } from '../schemas/credential.js';
 import { VerifiablePresentation } from '../schemas/presentation.js';
 
@@ -72,6 +73,15 @@ export interface CredentialVerificationResult {
    * see no change in result shape.
    */
   partial?: boolean;
+
+  /**
+   * Inclusive top-level timing for the producing
+   * `verifyCredential` call (start before any work, end after
+   * all checks settle). Only present when the call ran with
+   * `timing: true`. See {@link TaskTiming} and
+   * {@link CheckResult.timing}.
+   */
+  timing?: TaskTiming;
 }
 
 export interface PresentationVerificationResult {
@@ -112,4 +122,13 @@ export interface PresentationVerificationResult {
    * {@link CredentialVerificationResult.partial}.
    */
   partial?: boolean;
+
+  /**
+   * Inclusive top-level timing for the producing
+   * `verifyPresentation` call. Only present when the call ran
+   * with `timing: true`. Wraps presentation-level checks and
+   * every recursive `verifyCredential` invoked for embedded
+   * VCs. See {@link TaskTiming}.
+   */
+  timing?: TaskTiming;
 }

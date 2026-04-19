@@ -14,8 +14,6 @@ import type {
 } from '../src/types/check.js';
 import type { ProblemDetail } from '../src/types/problem-detail.js';
 
-const TS = '2026-04-18T12:00:00.000Z';
-
 const stubProblem: ProblemDetail = {
   type: 'urn:test:fail',
   title: 'Test failure',
@@ -62,7 +60,6 @@ function mkResult(
       suite,
       check,
       outcome: { status: 'success', message: 'ok' },
-      timestamp: TS,
       ...(options.fatal !== undefined ? { fatal: options.fatal } : {}),
     };
   }
@@ -71,7 +68,6 @@ function mkResult(
       suite,
       check,
       outcome: { status: 'failure', problems: [stubProblem] },
-      timestamp: TS,
       ...(options.fatal !== undefined ? { fatal: options.fatal } : {}),
     };
   }
@@ -79,7 +75,6 @@ function mkResult(
     suite,
     check,
     outcome: { status: 'skipped', reason: options.reason ?? 'n/a' },
-    timestamp: TS,
   };
 }
 

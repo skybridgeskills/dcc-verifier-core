@@ -13,6 +13,7 @@
 import type { ProblemDetail } from './problem-detail.js';
 import type { VerificationSubject } from './subject.js';
 import type { VerificationContext } from './context.js';
+import type { TaskTiming } from './timing.js';
 
 /**
  * Discriminated outcome of a single verification check.
@@ -35,8 +36,10 @@ export type CheckOutcome =
  * Tagged outcome emitted by the suite orchestrator.
  *
  * Wraps a `CheckOutcome` with metadata identifying which suite and check
- * produced it, plus a timestamp. The flat `CheckResult[]` array is the
- * primary report structure returned by `verifyCredential`.
+ * produced it. The flat `CheckResult[]` array is the primary report
+ * structure returned by `verifyCredential`. When the producing call
+ * ran with `timing: true`, each result also carries
+ * {@link CheckResult.timing}.
  */
 export interface CheckResult {
   /**
@@ -69,14 +72,18 @@ export interface CheckResult {
   suite: string;
 
   outcome: CheckOutcome;
-  /** ISO 8601 timestamp when the check was executed. */
-  timestamp: string;
   /**
    * Whether this check was marked fatal in its suite definition.
    * Fatal failures affect the overall `verified` status; non-fatal ones
    * are informational/warnings only.
    */
   fatal?: boolean;
+  /**
+   * Per-check timing data. Only populated when the producing
+   * call ran with `timing: true` on `VerifierConfig` or
+   * per-call. See {@link TaskTiming}.
+   */
+  timing?: TaskTiming;
 }
 
 /**

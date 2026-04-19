@@ -281,8 +281,14 @@ CheckOutcome
   └── { status: 'skipped', reason }
        │
        ▼
-CheckResult: { suite, check, outcome, timestamp }
+CheckResult: { suite, check, outcome, fatal?, timing? }
 ```
+
+`timing` is opt-in: present on every `CheckResult`,
+`SuiteSummary`, and top-level result only when the producing
+call ran with `timing: true`. Additive — no consumer reads
+break when the flag is left at its default (`false`). See
+[`docs/api/timing.md`](./api/timing.md).
 
 ### Key behaviors
 
@@ -506,7 +512,7 @@ VerifierConfig                       (long-lived deps: http, cache, crypto, regi
           → VerificationSuite[]
             → VerificationCheck.execute(subject, context)
               → CheckOutcome (success | failure | skip)
-                → CheckResult (suite, check, outcome, timestamp)
+                → CheckResult (suite, check, outcome, fatal?, timing?)
         → CredentialVerificationResult                  ({ verified, verifiableCredential, results })
 ```
 
@@ -557,27 +563,23 @@ recognition VC issued by a trust authority.
 
 ### Result folding
 
-Since v2.0.0, `results[]` (on both result types, and on each embedded
-`credentialResults[i]`) carries only failures and explicit
-`<suite>.applies` skips by default; the per-suite rollup lives in
-`summary[]`. Pass `verbose: true` (on the verifier or per call) to
-restore the legacy "every check" shape on `results[]`. The folding
-itself is implemented as a pure helper — `foldCheckResults` /
-`computeId` in `src/fold-results.ts` — and is also exported from the
-package barrel for consumers that append late results and want to
-re-fold.
+Since v2.0.0, `results[]` (on both result types, and on each embedded `credentialResults[i]`)
+carries only failures and explicit `<suite>.applies` skips by default; the per-suite rollup lives in
+`summary[]`. Pass `verbose: true` (on the verifier or per call) to restore the legacy "every check"
+shape on `results[]`. The folding itself is implemented as a pure helper — `foldCheckResults` /
+`computeId` in `src/fold-results.ts` — and is also exported from the package barrel for consumers
+that append late results and want to re-fold.
 
-See [`docs/api/verification-results.md`](api/verification-results.md)
-for the full reference, including the `id` namespace, rendering
-recipes, and the LLM prompt appendix for downstream UIs.
+See [`docs/api/verification-results.md`](api/verification-results.md) for the full reference,
+including the `id` namespace, rendering recipes, and the LLM prompt appendix for downstream UIs.
 
 Both shapes use the suite-based `CheckResult[]` model. Each `CheckResult` carries a discriminated
-`CheckOutcome` (`success | failure | skipped`) plus provenance (suite, check id, fatal flag,
-timestamp). The result objects are intentionally lean — no top-level flattened aggregate, no
-denormalized lists — so they remain cheap to persist (e.g. into Redis as part of a long-lived
-exchange) and to transit over the wire. Field names mirror the wire-level VC/VP property names so
-the result can be spread directly into a downstream variables object whose templates resolve
-properties by path.
+`CheckOutcome` (`success | failure | skipped`) plus provenance (suite, check id, fatal flag) and,
+optionally, a `timing: TaskTiming` populated when the producing call ran with `timing: true`. The
+result objects are intentionally lean — no top-level flattened aggregate, no denormalized lists —
+so they remain cheap to persist (e.g. into Redis as part of a long-lived exchange) and to transit
+over the wire. Field names mirror the wire-level VC/VP property names so the result can be spread
+directly into a downstream variables object whose templates resolve properties by path.
 
 When a single iterable view of every check is convenient, `flattenPresentationResults(result)`
 returns a `FlattenedCheckResult[]` that tags each entry with its provenance
@@ -652,9 +654,16 @@ without network dependencies, and composable — consumers wire in exactly the b
 ### What's already hexagonal
 
 - **`createVerifier(...)` is the composition root.** All concrete adapters
-  (`HttpGetService`, `CacheService`, `CryptoService[]`, `DocumentLoader`, `RegistryHandlerMap`)
+  (`HttpGetService`, `CacheService`, `CryptoService[]`, `DocumentLoader`, `RegistryHandlerMap`,
+  `TimeService`)
   are injectable on `VerifierConfig`; defaults live in internal lazy factories
   (`default-services.ts`) and are not exported.
+- **`TimeService` is the clock seam.** Wall-clock and monotonic time both flow through
+  `VerificationContext.timeService` (default `RealTimeService`). The orchestrator
+  (`runSuites`) uses it to populate `TaskTiming` when `timing: true`; checks may use it
+  for any time-sensitive decision (credential expiration, signature clock-skew window,
+  key rotation, status-list freshness). Tests pass `FakeTimeService` for deterministic
+  exact-value assertions on every `TaskTiming` field.
 - **Suites are plugins** with a uniform `VerificationCheck` interface. Adding a new check or suite
   requires no changes to the core orchestration; callers append via `additionalSuites`.
 - **`VerificationContext` carries injected services** (document loader, crypto services, cache,

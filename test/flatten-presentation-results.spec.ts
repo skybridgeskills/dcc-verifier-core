@@ -13,7 +13,6 @@ function mkCheck(suite: string, checkId: string): CheckResult {
     suite,
     check: checkId,
     outcome: { status: 'success', message: 'ok' },
-    timestamp: '2026-04-18T12:00:00.000Z',
   };
 }
 

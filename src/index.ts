@@ -28,6 +28,7 @@ export type {
 
 export type { CheckResult, CheckOutcome, VerificationCheck, VerificationSuite, VerificationSubjectType, SuitePhase } from './types/check.js';
 export type { SuiteSummary, SuiteSummaryPhase } from './types/suite-summary.js';
+export type { TaskTiming } from './types/timing.js';
 export type { ProblemDetail } from './types/problem-detail.js';
 export type { VerificationContext, DocumentLoader, FetchJson } from './types/context.js';
 export type { HttpGetResult } from './types/http.js';
@@ -42,6 +43,9 @@ export type { CacheService } from './services/cache-service/cache-service.js';
 export { InMemoryCacheService } from './services/cache-service/in-memory-cache-service.js';
 export type { HttpGetService } from './services/http-get-service/http-get-service.js';
 export { BuiltinHttpGetService } from './services/http-get-service/builtin-http-get-service.js';
+export type { TimeService } from './services/time-service/time-service.js';
+export { RealTimeService } from './services/time-service/real-time-service.js';
+export { FakeTimeService } from './services/time-service/fake-time-service.js';
 
 // ==================== Schema Types and Parsing ====================
 

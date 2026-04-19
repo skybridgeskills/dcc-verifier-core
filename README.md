@@ -14,6 +14,8 @@
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
 - [Custom Suites](#custom-suites)
 - [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)
+- [Capturing timing data](#capturing-timing-data)
+- [Pluggable clock (TimeService)](#pluggable-clock-timeservice)
 - [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
 - [Credential recognition + two-pass verification](#credential-recognition--two-pass-verification)
 - [Architecture](#architecture)
@@ -428,6 +430,45 @@ See [`docs/api/verification-results.md`](./docs/api/verification-results.md)
 for the full reference (phase model, `SuiteSummary` fields, `id`
 namespace, UI rendering recipe, and a prompt-ready appendix for
 downstream UIs).
+
+## Capturing timing data
+
+Every result can carry per-check, per-suite, and per-call
+`TaskTiming` data (wall-clock `startedAt` / `endedAt` plus a
+monotonic `durationMs`). Off by default; opt in via
+`timing: true` on `createVerifier(...)` or per-call. Mirrors
+`verbose`'s plumbing — per-call wins, and
+`verifyPresentation` propagates the flag into embedded
+`verifyCredential` calls so the top-level `result.timing` is
+an inclusive wrapper.
+
+```ts
+const verifier = createVerifier({ timing: true });
+const result = await verifier.verifyCredential({ credential });
+console.log(result.timing!.durationMs);
+console.log(result.summary[0].timing!.durationMs);
+```
+
+In `verbose: false` mode (the default), individual
+`CheckResult.timing` entries fold away in `results[]`, but the
+per-suite `SuiteSummary.timing` survives in `summary[]` so
+suite-grain timing is never lost. See
+[`docs/api/timing.md`](./docs/api/timing.md) for the full
+reference, granularity table, recipes, and a prompt-ready
+appendix.
+
+## Pluggable clock (`TimeService`)
+
+`verifier-core` reads wall-clock and monotonic time through a
+small `TimeService` interface. The default is `RealTimeService`
+(`Date.now` / `performance.now`); pass
+`{ timeService: FakeTimeService() }` on `createVerifier(...)`
+in tests to make every `TaskTiming` field
+exact-value-assertable. Both factories are exported from the
+package barrel. The same abstraction will back upcoming work
+on credential expiration, signature clock-skew windows, key
+rotation, and status-list freshness — see
+[`docs/api/timing.md`](./docs/api/timing.md) for the reference.
 
 ## Open Badges 3.0 verification (opt-in submodule)
 

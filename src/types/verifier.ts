@@ -18,6 +18,7 @@ import type { CacheService } from '../services/cache-service/cache-service.js';
 import type { CryptoService } from './crypto-service.js';
 import type { DocumentLoader } from './context.js';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
+import type { TimeService } from '../services/time-service/time-service.js';
 import type { EntityIdentityRegistry } from './registry.js';
 import type { SuitePhase, VerificationSuite } from './check.js';
 import type { RecognizerSpec } from './recognition.js';
@@ -112,6 +113,37 @@ export interface VerifierConfig {
    * `summary[]` is populated either way.
    */
   verbose?: boolean;
+
+  /**
+   * Default timing instrumentation flag for every call on this
+   * verifier. Per-call `timing` overrides this.
+   *
+   *  - `false` (default) — no `timing` fields appear on any
+   *    result; instrumentation has zero overhead.
+   *  - `true` — every `CheckResult` carries `timing`, every
+   *    `SuiteSummary` carries a rolled-up `timing`, and the
+   *    top-level result carries an inclusive `timing`.
+   *
+   * Pairs naturally with `verbose: true` so per-check timings
+   * survive into `results[]`. With `verbose: false` (default)
+   * the suite-level `timing` on `summary[]` is preserved by
+   * `foldCheckResults`, so suite-grain timing is never lost.
+   *
+   * @see ../../docs/api/timing.md
+   */
+  timing?: boolean;
+
+  /**
+   * Pluggable wall-clock + monotonic clock. Defaults to
+   * {@link RealTimeService}. Override with
+   * {@link FakeTimeService} from
+   * `@digitalcredentials/verifier-core` in tests for
+   * deterministic timing assertions, or with any other
+   * {@link TimeService} when injecting a controlled clock for
+   * future features (credential expiration, signature clock-
+   * skew window, key rotation).
+   */
+  timeService?: TimeService;
 }
 
 /** Per-call inputs for `verifyCredential`. */
@@ -140,6 +172,11 @@ export interface VerifyCredentialCall {
    * Per-call override of {@link VerifierConfig.verbose}.
    */
   verbose?: boolean;
+
+  /**
+   * Per-call override of {@link VerifierConfig.timing}.
+   */
+  timing?: boolean;
 }
 
 /** Per-call inputs for `verifyPresentation`. */
@@ -164,6 +201,9 @@ export interface VerifyPresentationCall {
 
   /** Per-call override of {@link VerifierConfig.verbose}. */
   verbose?: boolean;
+
+  /** Per-call override of {@link VerifierConfig.timing}. */
+  timing?: boolean;
 }
 
 /**

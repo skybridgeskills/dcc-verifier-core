@@ -77,12 +77,10 @@ describe('Foundation types', () => {
         check: 'core.proof-exists',
         suite: 'core',
         outcome: { status: 'success', message: 'Proof exists.' },
-        timestamp: new Date().toISOString(),
       };
       expect(result.suite).to.equal('core');
       expect(result.check).to.equal('core.proof-exists');
       expect(result.outcome.status).to.equal('success');
-      expect(result.timestamp).to.be.a('string');
     });
 
     it('accepts an optional namespaced id', () => {
@@ -91,7 +89,6 @@ describe('Foundation types', () => {
         check: 'core.proof-exists',
         suite: 'core',
         outcome: { status: 'success', message: 'Proof exists.' },
-        timestamp: new Date().toISOString(),
       };
       expect(result.id).to.equal('cryptographic.core.proof-exists');
     });

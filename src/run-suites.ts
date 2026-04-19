@@ -19,6 +19,8 @@ import {
 } from './types/check.js';
 import { VerificationContext } from './types/context.js';
 import { VerificationSubject } from './types/subject.js';
+import type { TimeService } from './services/time-service/time-service.js';
+import type { TaskTiming } from './types/timing.js';
 
 /**
  * Optional orchestration knobs.
@@ -101,41 +103,43 @@ export async function runSuites(
   options: RunSuitesOptions = {},
 ): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
+  const timing = context.timing === true;
+  const timeService = context.timeService;
 
   for (const suite of suites) {
     if (!suiteRunsInPhases(suite, options.phases)) continue;
 
     if (suite.applies && !suite.applies(subject, context)) {
       if (options.explicitSuiteIds?.has(suite.id)) {
-        results.push({
-          check: `${suite.id}.applies`,
-          suite: suite.id,
-          outcome: {
-            status: 'skipped',
-            reason: 'suite predicate returned false',
-          },
-          timestamp: new Date().toISOString(),
-        });
+        results.push(
+          buildSyntheticAppliesSkipResult(suite.id, timing, timeService),
+        );
       }
       continue;
     }
 
     for (const check of suite.checks) {
-      // Skip checks that don't apply to this subject type
       if (check.appliesTo && !appliesToSubject(check, subject)) {
         continue;
       }
 
+      const taskTiming = timing ? startTaskTiming(timeService) : undefined;
       const outcome: CheckOutcome = await check.execute(subject, context);
-      results.push({
+      const finishedTiming = taskTiming
+        ? finishTaskTiming(taskTiming, timeService)
+        : undefined;
+
+      const result: CheckResult = {
         check: check.id,
         suite: suite.id,
         outcome,
-        timestamp: new Date().toISOString(),
         fatal: check.fatal,
-      });
+      };
+      if (finishedTiming !== undefined) {
+        result.timing = finishedTiming;
+      }
+      results.push(result);
 
-      // Fatal failure stops remaining checks in this suite only
       if (check.fatal && outcome.status === 'failure') {
         break;
       }
@@ -143,4 +147,81 @@ export async function runSuites(
   }
 
   return results;
+}
+
+/**
+ * Internal: build the synthetic `<suite-id>.applies` skipped
+ * result, instrumenting `timing` when requested. The synthetic
+ * row represents an instantaneous decision (the `applies`
+ * predicate was already evaluated), so its timing window
+ * collapses to a single sample of each clock — `endedAt` and
+ * `durationMs` reflect the cost of recording the decision, not
+ * the predicate itself.
+ */
+function buildSyntheticAppliesSkipResult(
+  suiteId: string,
+  timing: boolean,
+  timeService: TimeService | undefined,
+): CheckResult {
+  const result: CheckResult = {
+    check: `${suiteId}.applies`,
+    suite: suiteId,
+    outcome: {
+      status: 'skipped',
+      reason: 'suite predicate returned false',
+    },
+  };
+  if (timing) {
+    const started = startTaskTiming(timeService);
+    result.timing = finishTaskTiming(started, timeService);
+  }
+  return result;
+}
+
+interface InProgressTiming {
+  startedAt: string;
+  startedMonoMs: number;
+}
+
+/**
+ * Sample wall-clock + monotonic clock at task start. Both
+ * samples flow through the injected {@link TimeService} so
+ * tests can pin them via `FakeTimeService`. Falls back to
+ * `Date` / `performance` only as a defensive guard for code
+ * paths that built a {@link VerificationContext} directly
+ * without setting `timeService`; production callers set it
+ * via `createVerifier(...)`.
+ */
+function startTaskTiming(
+  timeService: TimeService | undefined,
+): InProgressTiming {
+  const dateNowMs = timeService ? timeService.dateNowMs() : Date.now();
+  const startedMonoMs = timeService
+    ? timeService.performanceNowMs()
+    : performance.now();
+  return {
+    startedAt: new Date(dateNowMs).toISOString(),
+    startedMonoMs,
+  };
+}
+
+/**
+ * Close out an {@link InProgressTiming} by sampling both
+ * clocks again. `durationMs` comes from the monotonic clock
+ * (immune to wall-clock jumps); `startedAt` / `endedAt` come
+ * from the wall-clock for log correlation.
+ */
+function finishTaskTiming(
+  started: InProgressTiming,
+  timeService: TimeService | undefined,
+): TaskTiming {
+  const endDateMs = timeService ? timeService.dateNowMs() : Date.now();
+  const endMonoMs = timeService
+    ? timeService.performanceNowMs()
+    : performance.now();
+  return {
+    startedAt: started.startedAt,
+    endedAt: new Date(endDateMs).toISOString(),
+    durationMs: endMonoMs - started.startedMonoMs,
+  };
 }

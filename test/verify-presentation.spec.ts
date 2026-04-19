@@ -69,6 +69,66 @@ describe('verifyPresentation', () => {
     });
   });
 
+  describe('timing flag (presence/absence)', () => {
+    it('omits timing on every result by default', async () => {
+      const presentation = PresentationFactory();
+      const result = await verifyPresentation({ presentation, ...fakeVerified });
+
+      expect(result.timing).to.equal(undefined);
+      for (const c of result.presentationResults) {
+        expect(c.timing).to.equal(undefined);
+      }
+      for (const cr of result.credentialResults) {
+        expect(cr.timing).to.equal(undefined);
+      }
+    });
+
+    it('populates timing on every result when timing: true', async () => {
+      const presentation = PresentationFactory();
+      const result = await verifyPresentation({
+        presentation,
+        ...fakeVerified,
+        timing: true,
+      });
+
+      expect(result.timing).to.exist;
+      for (const c of result.presentationResults) {
+        expect(c.timing, `presentation check ${c.id} missing timing`).to.exist;
+      }
+      for (const s of result.summary) {
+        expect(s.timing, `presentation suite ${s.id} missing timing`).to.exist;
+      }
+      for (const cr of result.credentialResults) {
+        expect(cr.timing, 'credential result missing timing').to.exist;
+      }
+    });
+
+    it('top-level timing inclusively wraps recursive credential calls', async () => {
+      const presentation = PresentationFactory({
+        verifiableCredential: [
+          CredentialFactory({ version: 'v1', credential: {} }),
+          CredentialFactory({ credential: {} }),
+        ],
+      });
+      const result = await verifyPresentation({
+        presentation,
+        ...fakeVerified,
+        timing: true,
+      });
+
+      expect(result.timing).to.exist;
+      expect(result.credentialResults).to.have.lengthOf(2);
+      const topDuration = result.timing!.durationMs;
+      for (const cr of result.credentialResults) {
+        expect(cr.timing).to.exist;
+        expect(
+          topDuration,
+          'top-level durationMs should include each embedded credential',
+        ).to.be.at.least(cr.timing!.durationMs);
+      }
+    });
+  });
+
   describe('parsing errors', () => {
     it('returns verified: false for invalid presentation JSON', async () => {
       const result = await verifyPresentation({
