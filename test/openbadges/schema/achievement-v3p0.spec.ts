@@ -210,21 +210,29 @@ describe('Obv3p0AchievementSchema', () => {
     }
   });
 
-  it('passes resultDescription[] through unchanged (Phase 7 backfills)', () => {
-    const opaqueResultDescription = {
+  it('validates resultDescription[] entries and preserves passthrough fields', () => {
+    const validResultDescription = {
       id: 'urn:result-desc:1',
       type: ['ResultDescription'],
+      name: 'Score',
+      resultType: 'LetterGrade',
       arbitraryFutureField: { foo: 1 },
     };
     const parsed = Obv3p0AchievementSchema.safeParse({
       ...minimalAchievement,
-      resultDescription: [opaqueResultDescription],
+      resultDescription: [validResultDescription],
     });
     expect(parsed.success).to.be.true;
     if (parsed.success) {
-      expect(parsed.data.resultDescription?.[0]).to.deep.equal(
-        opaqueResultDescription,
-      );
+      expect(parsed.data.resultDescription?.[0]).to.deep.include({
+        id: 'urn:result-desc:1',
+        name: 'Score',
+        resultType: 'LetterGrade',
+      });
+      const entry = parsed.data.resultDescription?.[0] as unknown as {
+        arbitraryFutureField: { foo: number };
+      };
+      expect(entry.arbitraryFutureField.foo).to.equal(1);
     }
   });
 });

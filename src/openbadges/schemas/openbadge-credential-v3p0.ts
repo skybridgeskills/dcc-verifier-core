@@ -57,7 +57,18 @@ const TypeField = JsonLdTypeField(['VerifiableCredential']).superRefine(
   },
 );
 
-export const Obv3p0OpenBadgeCredentialSchema = z
+/**
+ * The composed envelope schema. Annotated as `z.ZodTypeAny` on
+ * the public export to break the inferred-type chain — without
+ * this, `tsc --declaration` runs into TS7056 ("inferred type
+ * exceeds the maximum length the compiler will serialize")
+ * because the union/refine layers compound across every nested
+ * class schema (Phase 7 was the straw that broke the camel's
+ * back). Runtime behavior is unaffected; consumers narrow
+ * `Obv3p0OpenBadgeCredential` (typed as a permissive record
+ * below) at use, typically via `recognizedProfile`.
+ */
+export const Obv3p0OpenBadgeCredentialSchema: z.ZodTypeAny = z
   .object({
     '@context': ContextArray,
     id: IriString,
@@ -89,9 +100,18 @@ export const Obv3p0OpenBadgeCredentialSchema = z
     }
   });
 
-export type Obv3p0OpenBadgeCredential = z.infer<
-  typeof Obv3p0OpenBadgeCredentialSchema
->;
+/**
+ * The normalized OB 3.0 OpenBadgeCredential shape produced by
+ * {@link parseObv3p0OpenBadgeCredential}.
+ *
+ * Typed as `Record<string, unknown>` because the strict envelope
+ * inference is too deep to emit as a `.d.ts` (see schema export's
+ * note on TS7056). Consumers that need deeper static typing
+ * should narrow with `recognizedProfile === 'obv3p0.openbadge'`
+ * and then cast to a domain-specific interface; runtime
+ * validation has already proven the shape.
+ */
+export type Obv3p0OpenBadgeCredential = Record<string, unknown>;
 
 /**
  * Parse an unknown into an `Obv3p0OpenBadgeCredential`. Returns a

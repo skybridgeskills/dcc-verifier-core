@@ -71,6 +71,9 @@ export {
   Obv3p0AlignmentSchema,
   Obv3p0AchievementSchema,
   Obv3p0AchievementSubjectSchema,
+  Obv3p0RubricCriterionLevelSchema,
+  Obv3p0ResultDescriptionSchema,
+  Obv3p0ResultSchema,
 } from './schemas/classes-v3p0.js';
 export type {
   Obv3p0Image,
@@ -78,6 +81,9 @@ export type {
   Obv3p0Alignment,
   Obv3p0Achievement,
   Obv3p0AchievementSubject,
+  Obv3p0RubricCriterionLevel,
+  Obv3p0ResultDescription,
+  Obv3p0Result,
 } from './schemas/classes-v3p0.js';
 
 export {

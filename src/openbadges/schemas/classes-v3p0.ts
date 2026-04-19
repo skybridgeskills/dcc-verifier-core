@@ -1,10 +1,6 @@
 /**
  * Open Badges 3.0 inner-class schemas.
  *
- * Phase 3 seeds this file with the `Image` class (§B.1.13).
- * Later phases (4–7) append `Profile`, `Alignment`, `Achievement`,
- * `AchievementSubject`, and the `Result` family.
- *
  * **Colocation note**: the per-class `*Field()` builders live in
  * this file alongside their schemas (rather than in
  * `fields-v3p0.ts`) to avoid an ESM circular-import deadlock —
@@ -14,8 +10,6 @@
  * stays focused on field builders that don't depend on a class
  * schema (constants, `IriString`, `JsonLdTypeField`,
  * `ProfileRefField`).
- *
- * @see `docs/plans/2026-04-18-openbadges-recognizer-and-subchecks/03-image.md`
  */
 
 import { z } from 'zod';
@@ -106,8 +100,6 @@ export type Obv3p0Profile = z.infer<typeof Obv3p0ProfileSchema>;
  *
  * Normalizes the string form to `{ id, type: ['Profile'] }` so
  * consumers can always treat the value as an object.
- *
- * Replaces the Phase-2 placeholder in `fields-v3p0.ts`.
  */
 export function ProfileRefField() {
   return z.union([
@@ -141,6 +133,98 @@ export const Obv3p0AlignmentSchema = z
 export type Obv3p0Alignment = z.infer<typeof Obv3p0AlignmentSchema>;
 
 /**
+ * Open Badges 3.0 §B.1.18 — RubricCriterionLevel class.
+ *
+ * Required: `id`, `type` (must include `'RubricCriterionLevel'`),
+ * `name`. Optional in scope: `alignment[]`, `description`,
+ * `level`, `points`.
+ *
+ * Referenced from
+ * {@link Obv3p0ResultDescriptionSchema}.`rubricCriterionLevel[]`,
+ * and from {@link Obv3p0ResultSchema}.`achievedLevel` (by IRI).
+ */
+export const Obv3p0RubricCriterionLevelSchema = z
+  .object({
+    id: z.string().url(),
+    type: JsonLdTypeField(['RubricCriterionLevel']),
+    name: z.string(),
+    alignment: z.array(Obv3p0AlignmentSchema).optional(),
+    description: z.string().optional(),
+    level: z.string().optional(),
+    points: z.string().optional(),
+  })
+  .passthrough();
+
+export type Obv3p0RubricCriterionLevel = z.infer<
+  typeof Obv3p0RubricCriterionLevelSchema
+>;
+
+/**
+ * Open Badges 3.0 §B.1.17 — ResultDescription class.
+ *
+ * Required: `id`, `type` (must include `'ResultDescription'`),
+ * `name`, `resultType`. Optional in scope: `alignment[]`,
+ * `allowedValue[]`, `requiredLevel` (IRI ref into a
+ * RubricCriterionLevel), `requiredValue`,
+ * `rubricCriterionLevel[]`, `valueMax`, `valueMin`.
+ *
+ * Backfilled into {@link Obv3p0AchievementSchema}.`resultDescription[]`.
+ */
+export const Obv3p0ResultDescriptionSchema = z
+  .object({
+    id: z.string().url(),
+    type: JsonLdTypeField(['ResultDescription']),
+    name: z.string(),
+    resultType: z.string(),
+    alignment: z.array(Obv3p0AlignmentSchema).optional(),
+    allowedValue: z.array(z.string()).optional(),
+    requiredLevel: z.string().url().optional(),
+    requiredValue: z.string().optional(),
+    rubricCriterionLevel: z
+      .array(Obv3p0RubricCriterionLevelSchema)
+      .optional(),
+    valueMax: z.string().optional(),
+    valueMin: z.string().optional(),
+  })
+  .passthrough();
+
+export type Obv3p0ResultDescription = z.infer<
+  typeof Obv3p0ResultDescriptionSchema
+>;
+
+/**
+ * Open Badges 3.0 §B.1.16 — Result class.
+ *
+ * Required: `type` (must include `'Result'`).
+ * Optional in scope: `achievedLevel` (IRI ref to a
+ * RubricCriterionLevel), `alignment[]`, `resultDescription` (IRI
+ * ref to an `Obv3p0ResultDescriptionSchema` entry inside the same
+ * credential's `Achievement.resultDescription[]`), `status`,
+ * `value`.
+ *
+ * **Note**: `Result.resultDescription` is a string IRI cross-
+ * referencing an entry in `Achievement.resultDescription[]`. The
+ * existing `obv3-result-ref-check` (refactored in Phase 8 to use
+ * the normalized form) verifies that the reference resolves;
+ * this schema only validates that the field is a syntactically
+ * valid URL string.
+ *
+ * Backfilled into {@link Obv3p0AchievementSubjectSchema}.`result[]`.
+ */
+export const Obv3p0ResultSchema = z
+  .object({
+    type: JsonLdTypeField(['Result']),
+    achievedLevel: z.string().url().optional(),
+    alignment: z.array(Obv3p0AlignmentSchema).optional(),
+    resultDescription: z.string().url().optional(),
+    status: z.string().optional(),
+    value: z.string().optional(),
+  })
+  .passthrough();
+
+export type Obv3p0Result = z.infer<typeof Obv3p0ResultSchema>;
+
+/**
  * Open Badges 3.0 §B.1.6 — Criteria class (file-local).
  *
  * Both `id` and `narrative` are optional per spec — Criteria is a
@@ -165,8 +249,8 @@ const Obv3p0CriteriaSchema = z
  * - `alignment[]` — array of {@link Obv3p0AlignmentSchema}.
  * - `creator` — Profile (normalized via {@link ProfileRefField}).
  * - `image` — Image (normalized via {@link ImageField}).
- * - `resultDescription[]` — passthrough until Phase 7 adds the
- *   real `Obv3p0ResultDescriptionSchema`.
+ * - `resultDescription[]` — array of
+ *   {@link Obv3p0ResultDescriptionSchema} (Phase 7).
  *
  * Wired into `AchievementSubject.achievement` in Phase 6.
  */
@@ -180,7 +264,7 @@ export const Obv3p0AchievementSchema = z
     alignment: z.array(Obv3p0AlignmentSchema).optional(),
     creator: ProfileRefField().optional(),
     image: ImageField().optional(),
-    resultDescription: z.array(z.object({}).passthrough()).optional(),
+    resultDescription: z.array(Obv3p0ResultDescriptionSchema).optional(),
   })
   .passthrough();
 
@@ -213,9 +297,10 @@ const Obv3p0IdentityObjectSchema = z
  * when neither is present, which surfaces as
  * `/credentialSubject` once backfilled into the envelope.
  *
- * Optional in scope: `result[]` (passthrough until Phase 7),
- * `image` (normalized via {@link ImageField}), `identifier[]`
- * (entries kept light per the IdentityObject note above).
+ * Optional in scope: `result[]` (array of
+ * {@link Obv3p0ResultSchema}, Phase 7), `image` (normalized via
+ * {@link ImageField}), `identifier[]` (entries kept light per the
+ * IdentityObject note above).
  */
 export const Obv3p0AchievementSubjectSchema = z
   .object({
@@ -223,7 +308,7 @@ export const Obv3p0AchievementSubjectSchema = z
     achievement: Obv3p0AchievementSchema,
     id: z.string().url().optional(),
     identifier: z.array(Obv3p0IdentityObjectSchema).optional(),
-    result: z.array(z.object({}).passthrough()).optional(),
+    result: z.array(Obv3p0ResultSchema).optional(),
     image: ImageField().optional(),
   })
   .passthrough()
