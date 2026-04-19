@@ -173,6 +173,33 @@ describe('@digitalcredentials/verifier-core/openbadges (integration)', () => {
     );
   });
 
+  it('emits a synthetic <suite-id>.applies skip when openBadgesSuite is queued against a non-OB credential', async () => {
+    const nonObCredential: Record<string, unknown> = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      id: 'https://example.test/credentials/non-ob',
+      type: ['VerifiableCredential'],
+      issuer: 'https://example.test/issuer',
+      validFrom: '2024-01-01T00:00:00Z',
+      credentialSubject: { id: 'did:example:subject' },
+    };
+
+    const verifier = createVerifier(fakeVerified);
+    const result = await verifier.verifyCredential({
+      credential: nonObCredential,
+      additionalSuites: [openBadgesSuite],
+    });
+
+    const obSuiteResults = result.results.filter(r => r.suite === 'openbadges');
+    expect(obSuiteResults).to.have.lengthOf(1);
+    expect(obSuiteResults[0].check).to.equal('openbadges.applies');
+    expect(obSuiteResults[0].outcome.status).to.equal('skipped');
+    if (obSuiteResults[0].outcome.status === 'skipped') {
+      expect(obSuiteResults[0].outcome.reason).to.equal(
+        'suite predicate returned false',
+      );
+    }
+  });
+
   it('createObv3UnknownAchievementTypeCheck composes a custom-vocab check', async () => {
     const credential = cloneCredential();
     const achievement = (credential.credentialSubject as {

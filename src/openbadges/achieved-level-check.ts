@@ -4,6 +4,7 @@ import { VerificationSubject } from '../types/subject.js';
 import { VerificationContext } from '../types/context.js';
 import { Obv3ProblemTypes } from './problem-types.js';
 import { Obv3CredentialSubjectShape } from './openbadges-zod.js';
+import { formatJsonPointer } from '../util/json-pointer.js';
 
 /**
  * OBv3 `Result.achievedLevel` validity check.
@@ -99,12 +100,20 @@ export const obv3AchievedLevelCheck: VerificationCheck = {
       if (typeof entry.resultDescription !== 'string') continue;
       checkedCount++;
 
+      const achievedLevelPointer = formatJsonPointer([
+        'credentialSubject',
+        'result',
+        index,
+        'achievedLevel',
+      ]);
+
       const validLevels = levelsByRdId.get(entry.resultDescription);
       if (!validLevels) {
         problems.push({
           type: Obv3ProblemTypes.OB_INVALID_ACHIEVED_LEVEL,
           title: 'Invalid Achieved Level',
           detail: `Result entry at index ${index} claims achievedLevel "${entry.achievedLevel}", but the referenced ResultDescription "${entry.resultDescription}" declares no rubricCriterionLevel entries.`,
+          instance: achievedLevelPointer,
         });
         continue;
       }
@@ -115,6 +124,7 @@ export const obv3AchievedLevelCheck: VerificationCheck = {
           type: Obv3ProblemTypes.OB_INVALID_ACHIEVED_LEVEL,
           title: 'Invalid Achieved Level',
           detail: `Result entry at index ${index} claims achievedLevel "${entry.achievedLevel}" which is not declared in the referenced ResultDescription "${entry.resultDescription}" (valid levels: ${validList}).`,
+          instance: achievedLevelPointer,
         });
       }
     }

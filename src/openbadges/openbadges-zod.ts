@@ -30,6 +30,35 @@
  * - `Obv3CredentialSubjectShape` — top-level entry shape used by all
  *                                  checks via
  *                                  `safeParse(credential.credentialSubject)`.
+ *
+ * ## Why these are kept alongside the strict `Obv3p0OpenBadgeCredentialSchema`
+ *
+ * The 2026-04-18 P-C plan introduced a strict envelope schema in
+ * `schemas/classes-v3p0.ts` and `schemas/openbadge-credential-v3p0.ts`
+ * that validates an OB 3.0 credential top-to-bottom. That schema
+ * powers the recognition pipeline (`obv3p0Recognizer`) and the public
+ * `recognition.profile` check.
+ *
+ * The cross-field semantic checks below intentionally **do not**
+ * adopt the strict schema for parsing. The two regimes serve
+ * different purposes:
+ *
+ * - **Strict envelope** answers "is this a well-formed OB 3.0
+ *   credential?" — a binary, top-to-bottom precondition that gates
+ *   trust signals and surfaces every shape violation with an
+ *   `instance` JSON Pointer.
+ * - **Tolerant semantic shapes** answer "given a credential the
+ *   issuer asserts is OB-shaped, do its cross-references hang
+ *   together?" — a per-rule observation that should still fire when
+ *   one nearby field is malformed. A `RubricCriterionLevel` missing
+ *   `name` should not silence the `result-ref` check on a valid
+ *   sibling.
+ *
+ * Refactoring these checks to consume the strict normalized form was
+ * explicitly considered (see Phase 8 of the plan) and rejected: the
+ * resilience gain from per-rule scoping outweighs the deduplication
+ * win, and consumers who want strict envelope feedback get it from
+ * the recognition pipeline directly.
  */
 
 import { z } from 'zod';

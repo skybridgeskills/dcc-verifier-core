@@ -7,6 +7,7 @@ import {
   KNOWN_ACHIEVEMENT_TYPES,
   ACHIEVEMENT_TYPE_EXT_PREFIX,
 } from './known-achievement-types.js';
+import { formatJsonPointer } from '../util/json-pointer.js';
 
 const CHECK_ID = 'schema.obv3.unknown-achievement-type';
 const CHECK_NAME = 'OBv3 Unknown AchievementType Check';
@@ -37,10 +38,14 @@ function evaluateAchievementType(
     const target = isArray
       ? `achievement.achievementType[${index}]`
       : 'achievement.achievementType';
+    const pointerSegments: Array<string | number> = isArray
+      ? ['credentialSubject', 'achievement', 'achievementType', index]
+      : ['credentialSubject', 'achievement', 'achievementType'];
     problems.push({
       type: Obv3ProblemTypes.OB_UNKNOWN_ACHIEVEMENT_TYPE,
       title: 'Unknown Achievement Type',
       detail: `${target} = "${entry}" is not in the known AchievementType vocabulary and does not use the "${ACHIEVEMENT_TYPE_EXT_PREFIX}" extension prefix.`,
+      instance: formatJsonPointer(pointerSegments),
     });
   }
 

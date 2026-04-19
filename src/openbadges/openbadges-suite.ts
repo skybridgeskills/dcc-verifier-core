@@ -33,17 +33,37 @@
  */
 
 import { VerificationSuite } from '../types/check.js';
+import { VerificationSubject } from '../types/subject.js';
 import { obv3ResultRefCheck } from './result-ref-check.js';
 import { obv3AchievedLevelCheck } from './achieved-level-check.js';
 import { obv3MissingResultStatusCheck } from './missing-result-status-check.js';
 import { obv3UnknownAchievementTypeCheck } from './unknown-achievement-type-check.js';
 import { obv3SchemaCheck } from '../suites/schema/obv3/obv3-schema-check.js';
+import { isOpenBadgeCredential } from './recognize.js';
+
+/**
+ * Suite-level applicability predicate shared by all three OB
+ * bundles. Combined with `runSuites`' `explicitSuiteIds` machinery,
+ * this gives consumers two crisp signals depending on how they
+ * called the verifier:
+ *
+ * - **Implicit** (default suite set, suite happens to be enabled
+ *   elsewhere in the pipeline): non-OB credentials produce zero
+ *   results from these suites.
+ * - **Explicit** (consumer passes the suite via `additionalSuites`):
+ *   non-OB credentials produce exactly one synthetic
+ *   `<suite-id>.applies` `'skipped'` `CheckResult` so the consumer
+ *   can audit that their request was acknowledged.
+ */
+const appliesToOpenBadge = (subject: VerificationSubject): boolean =>
+  isOpenBadgeCredential(subject.verifiableCredential);
 
 export const openBadgesSemanticSuite: VerificationSuite = {
   id: 'openbadges.semantic',
   name: 'OpenBadges Semantic',
   description:
     'OpenBadges 3.0 cross-field semantic checks (no JSON Schema fetch).',
+  applies: appliesToOpenBadge,
   checks: [
     obv3ResultRefCheck,
     obv3AchievedLevelCheck,
@@ -57,6 +77,7 @@ export const openBadgesSchemaSuite: VerificationSuite = {
   name: 'OpenBadges JSON Schema',
   description:
     'AJV-backed validation against the published OBv3 JSON Schemas.',
+  applies: appliesToOpenBadge,
   checks: [obv3SchemaCheck],
 };
 
@@ -65,6 +86,7 @@ export const openBadgesSuite: VerificationSuite = {
   name: 'OpenBadges',
   description:
     'OpenBadges 3.0 verification: semantic checks plus JSON Schema validation.',
+  applies: appliesToOpenBadge,
   checks: [
     ...openBadgesSemanticSuite.checks,
     ...openBadgesSchemaSuite.checks,

@@ -7,6 +7,7 @@ import { buildTestContext } from '../factories/services/build-test-context.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { compose } from '../factories/data/compose.js';
 import { addResults } from '../factories/data/transforms.js';
+import { formatJsonPointer } from '../../src/util/json-pointer.js';
 
 const resultRefSuite: VerificationSuite = {
   id: 'openbadges.result-ref',
@@ -110,6 +111,9 @@ describe('OBv3 result-ref check', () => {
         'https://www.w3.org/TR/vc-data-model#OB_INVALID_RESULT_REFERENCE',
       );
       expect(refCheck.outcome.problems[0].detail).to.include('does not exist');
+      expect(refCheck.outcome.problems[0].instance).to.equal(
+        formatJsonPointer(['credentialSubject', 'result', 0, 'resultDescription']),
+      );
     }
   });
 
@@ -149,6 +153,56 @@ describe('OBv3 result-ref check', () => {
     if (refCheck?.outcome.status === 'failure') {
       expect(refCheck.outcome.problems).to.have.lengthOf(1);
       expect(refCheck.outcome.problems[0].detail).to.include('index 1');
+      expect(refCheck.outcome.problems[0].instance).to.equal(
+        formatJsonPointer(['credentialSubject', 'result', 1, 'resultDescription']),
+      );
+    }
+  });
+
+  it('emits one instance pointer per offending entry', async () => {
+    const cred = compose(
+      CredentialFactory({ version: 'v2', credential: {} }),
+      addResults({
+        results: [
+          {
+            type: 'Result',
+            resultDescription: 'https://example.test/result-descriptions/missing-a',
+            value: 'A',
+          },
+          {
+            type: 'Result',
+            resultDescription: 'https://example.test/result-descriptions/1',
+            value: 'B',
+          },
+          {
+            type: 'Result',
+            resultDescription: 'https://example.test/result-descriptions/missing-c',
+            value: 'C',
+          },
+        ],
+        resultDescriptions: [
+          {
+            id: 'https://example.test/result-descriptions/1',
+            type: 'ResultDescription',
+            name: 'Test Score',
+          },
+        ],
+      }),
+    );
+    const results = await runSuites(
+      [resultRefSuite],
+      createSubject(cred),
+      buildTestContext(),
+    );
+
+    const refCheck = results.find(r => r.check === 'schema.obv3.result-ref');
+    expect(refCheck?.outcome.status).to.equal('failure');
+    if (refCheck?.outcome.status === 'failure') {
+      const instances = refCheck.outcome.problems.map(p => p.instance);
+      expect(instances).to.deep.equal([
+        formatJsonPointer(['credentialSubject', 'result', 0, 'resultDescription']),
+        formatJsonPointer(['credentialSubject', 'result', 2, 'resultDescription']),
+      ]);
     }
   });
 

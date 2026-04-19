@@ -7,6 +7,7 @@ import { buildTestContext } from '../factories/services/build-test-context.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { compose } from '../factories/data/compose.js';
 import { addResults } from '../factories/data/transforms.js';
+import { formatJsonPointer } from '../../src/util/json-pointer.js';
 
 const missingStatusSuite: VerificationSuite = {
   id: 'openbadges.missing-result-status',
@@ -162,6 +163,9 @@ describe('OBv3 missing-result-status check', () => {
       );
       expect(check.outcome.problems[0].detail).to.include('index 0');
       expect(check.outcome.problems[0].detail).to.include(RD_STATUS_ID);
+      expect(check.outcome.problems[0].instance).to.equal(
+        formatJsonPointer(['credentialSubject', 'result', 0]),
+      );
     }
   });
 
@@ -331,6 +335,10 @@ describe('OBv3 missing-result-status check', () => {
       expect(check.outcome.problems).to.have.lengthOf(2);
       expect(check.outcome.problems[0].detail).to.include('index 1');
       expect(check.outcome.problems[1].detail).to.include('index 2');
+      expect(check.outcome.problems.map(p => p.instance)).to.deep.equal([
+        formatJsonPointer(['credentialSubject', 'result', 1]),
+        formatJsonPointer(['credentialSubject', 'result', 2]),
+      ]);
     }
   });
 });

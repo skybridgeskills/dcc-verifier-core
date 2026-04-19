@@ -8,6 +8,7 @@ import { VerificationCheck, VerificationSuite } from '../../src/types/check.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { buildTestContext } from '../factories/services/build-test-context.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
+import { formatJsonPointer } from '../../src/util/json-pointer.js';
 
 const CHECK_ID = 'schema.obv3.unknown-achievement-type';
 
@@ -81,6 +82,13 @@ describe('OBv3 unknown-achievement-type check', () => {
         );
         expect(result.outcome.problems[0].detail).to.include('NotARealType');
         expect(result.outcome.problems[0].detail).to.include('achievement.achievementType =');
+        expect(result.outcome.problems[0].instance).to.equal(
+          formatJsonPointer([
+            'credentialSubject',
+            'achievement',
+            'achievementType',
+          ]),
+        );
       }
     });
 
@@ -99,6 +107,20 @@ describe('OBv3 unknown-achievement-type check', () => {
         expect(result.outcome.problems[0].detail).to.include('NotARealType');
         expect(result.outcome.problems[1].detail).to.include('achievement.achievementType[3]');
         expect(result.outcome.problems[1].detail).to.include('AlsoFake');
+        expect(result.outcome.problems.map(p => p.instance)).to.deep.equal([
+          formatJsonPointer([
+            'credentialSubject',
+            'achievement',
+            'achievementType',
+            1,
+          ]),
+          formatJsonPointer([
+            'credentialSubject',
+            'achievement',
+            'achievementType',
+            3,
+          ]),
+        ]);
       }
     });
 

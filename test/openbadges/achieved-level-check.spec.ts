@@ -7,6 +7,7 @@ import { buildTestContext } from '../factories/services/build-test-context.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { compose } from '../factories/data/compose.js';
 import { addResults } from '../factories/data/transforms.js';
+import { formatJsonPointer } from '../../src/util/json-pointer.js';
 
 const achievedLevelSuite: VerificationSuite = {
   id: 'openbadges.achieved-level',
@@ -171,6 +172,9 @@ describe('OBv3 achieved-level check', () => {
       );
       expect(check.outcome.problems[0].detail).to.include(LEVEL_DISTINCTION);
       expect(check.outcome.problems[0].detail).to.include(LEVEL_PASS);
+      expect(check.outcome.problems[0].instance).to.equal(
+        formatJsonPointer(['credentialSubject', 'result', 0, 'achievedLevel']),
+      );
     }
   });
 
@@ -205,6 +209,9 @@ describe('OBv3 achieved-level check', () => {
     expect(check?.outcome.status).to.equal('failure');
     if (check?.outcome.status === 'failure') {
       expect(check.outcome.problems[0].detail).to.include('declares no rubricCriterionLevel');
+      expect(check.outcome.problems[0].instance).to.equal(
+        formatJsonPointer(['credentialSubject', 'result', 0, 'achievedLevel']),
+      );
     }
   });
 
@@ -325,6 +332,10 @@ describe('OBv3 achieved-level check', () => {
       expect(check.outcome.problems[0].detail).to.include(LEVEL_DISTINCTION);
       expect(check.outcome.problems[1].detail).to.include('index 2');
       expect(check.outcome.problems[1].detail).to.include('honors');
+      expect(check.outcome.problems.map(p => p.instance)).to.deep.equal([
+        formatJsonPointer(['credentialSubject', 'result', 1, 'achievedLevel']),
+        formatJsonPointer(['credentialSubject', 'result', 2, 'achievedLevel']),
+      ]);
     }
   });
 });

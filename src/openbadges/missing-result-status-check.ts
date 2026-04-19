@@ -4,6 +4,7 @@ import { VerificationSubject } from '../types/subject.js';
 import { VerificationContext } from '../types/context.js';
 import { Obv3ProblemTypes } from './problem-types.js';
 import { Obv3CredentialSubjectShape } from './openbadges-zod.js';
+import { formatJsonPointer } from '../util/json-pointer.js';
 
 /**
  * OBv3 missing-`Result.status` check.
@@ -109,6 +110,11 @@ export const obv3MissingResultStatusCheck: VerificationCheck = {
           type: Obv3ProblemTypes.OB_MISSING_RESULT_STATUS,
           title: 'Missing Result Status',
           detail: `Result entry at index ${index} references a Status-typed ResultDescription "${entry.resultDescription}" but is missing a non-empty status value.`,
+          instance: formatJsonPointer([
+            'credentialSubject',
+            'result',
+            index,
+          ]),
         });
       }
     }

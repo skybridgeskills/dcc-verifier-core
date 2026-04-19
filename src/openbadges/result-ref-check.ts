@@ -4,6 +4,7 @@ import { VerificationSubject } from '../types/subject.js';
 import { VerificationContext } from '../types/context.js';
 import { Obv3ProblemTypes } from './problem-types.js';
 import { Obv3CredentialSubjectShape } from './openbadges-zod.js';
+import { formatJsonPointer } from '../util/json-pointer.js';
 
 /**
  * OBv3 Result→ResultDescription reference check.
@@ -77,6 +78,12 @@ export const obv3ResultRefCheck: VerificationCheck = {
       type: Obv3ProblemTypes.OB_INVALID_RESULT_REFERENCE,
       title: 'Invalid Result Reference',
       detail: `Result entry at index ${index} references ResultDescription id "${ref}" which does not exist in achievement.resultDescription`,
+      instance: formatJsonPointer([
+        'credentialSubject',
+        'result',
+        index,
+        'resultDescription',
+      ]),
     }));
 
     return {
