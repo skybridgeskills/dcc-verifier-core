@@ -115,4 +115,74 @@ export function ProfileRefField() {
     Obv3p0ProfileSchema,
   ]);
 }
+
+/**
+ * Open Badges 3.0 §B.1.5 — Alignment class.
+ *
+ * Required: `type` (must include `'Alignment'`), `targetName`,
+ * `targetUrl`. Optional in scope: `targetCode`,
+ * `targetDescription`, `targetFramework`, `targetType`.
+ *
+ * `targetUrl` keeps `z.string().url()` — alignments point to
+ * webpages describing the framework target, not generic IRIs.
+ */
+export const Obv3p0AlignmentSchema = z
+  .object({
+    type: JsonLdTypeField(['Alignment']),
+    targetName: z.string(),
+    targetUrl: z.string().url(),
+    targetCode: z.string().optional(),
+    targetDescription: z.string().optional(),
+    targetFramework: z.string().optional(),
+    targetType: z.string().optional(),
+  })
+  .passthrough();
+
+export type Obv3p0Alignment = z.infer<typeof Obv3p0AlignmentSchema>;
+
+/**
+ * Open Badges 3.0 §B.1.6 — Criteria class (file-local).
+ *
+ * Both `id` and `narrative` are optional per spec — Criteria is a
+ * discoverability hint, an empty object is structurally valid.
+ * Kept private to this module; callers reach it via
+ * `Obv3p0AchievementSchema.criteria`.
+ */
+const Obv3p0CriteriaSchema = z
+  .object({
+    id: z.string().url().optional(),
+    narrative: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Open Badges 3.0 §B.1.1 — Achievement class.
+ *
+ * Required: `id`, `type` (must include `'Achievement'`),
+ * `criteria`, `description`, `name`.
+ *
+ * Optional in scope:
+ * - `alignment[]` — array of {@link Obv3p0AlignmentSchema}.
+ * - `creator` — Profile (normalized via {@link ProfileRefField}).
+ * - `image` — Image (normalized via {@link ImageField}).
+ * - `resultDescription[]` — passthrough until Phase 7 adds the
+ *   real `Obv3p0ResultDescriptionSchema`.
+ *
+ * Wired into `AchievementSubject.achievement` in Phase 6.
+ */
+export const Obv3p0AchievementSchema = z
+  .object({
+    id: z.string().url(),
+    type: JsonLdTypeField(['Achievement']),
+    criteria: Obv3p0CriteriaSchema,
+    description: z.string(),
+    name: z.string(),
+    alignment: z.array(Obv3p0AlignmentSchema).optional(),
+    creator: ProfileRefField().optional(),
+    image: ImageField().optional(),
+    resultDescription: z.array(z.object({}).passthrough()).optional(),
+  })
+  .passthrough();
+
+export type Obv3p0Achievement = z.infer<typeof Obv3p0AchievementSchema>;
 /* eslint-enable @typescript-eslint/explicit-function-return-type */

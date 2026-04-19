@@ -68,8 +68,15 @@ export {
   ImageField,
   Obv3p0ProfileSchema,
   ProfileRefField,
+  Obv3p0AlignmentSchema,
+  Obv3p0AchievementSchema,
 } from './schemas/classes-v3p0.js';
-export type { Obv3p0Image, Obv3p0Profile } from './schemas/classes-v3p0.js';
+export type {
+  Obv3p0Image,
+  Obv3p0Profile,
+  Obv3p0Alignment,
+  Obv3p0Achievement,
+} from './schemas/classes-v3p0.js';
 
 export {
   Obv3ProblemTypes as OpenBadgesProblemTypes,
