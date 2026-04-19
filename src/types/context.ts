@@ -15,6 +15,7 @@ import type { CryptoService } from './crypto-service.js';
 import type { CryptoSuite } from './crypto-suite.js';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
 import type { EntityIdentityRegistry, LookupIssuers } from './registry.js';
+import type { RecognizerSpec } from './recognition.js';
 
 /**
  * Resolves a URL to a JSON-LD document (or other linked resource).
@@ -89,4 +90,11 @@ export interface VerificationContext {
    * build a {@link VerificationContext} directly.
    */
   verifyBitstringStatusListCredential?: boolean;
+  /**
+   * Pluggable credential recognizers. Threaded through from
+   * {@link VerifierConfig.recognizers} so the built-in
+   * `recognitionSuite` can iterate them without depending on the
+   * verifier factory directly.
+   */
+  recognizers?: RecognizerSpec[];
 }

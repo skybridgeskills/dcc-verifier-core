@@ -36,6 +36,7 @@ import type {
 } from './types/verifier.js';
 import type { VerificationContext } from './types/context.js';
 import type { VerificationSuite, CheckResult } from './types/check.js';
+import type { RecognitionResult, RecognizerSpec } from './types/recognition.js';
 import type {
   CredentialVerificationResult,
   PresentationVerificationResult,
@@ -66,6 +67,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
   const documentLoader = config.documentLoader ?? defaultDocumentLoaderFor(httpGetService);
   const fetchJson = fetchJsonFromHttpGet(httpGetService);
   const constructorRegistries = config.registries;
+  const recognizers = config.recognizers ?? [];
 
   // Forward-declared verifier reference. The lookupIssuers thunk closes
   // over this slot so handlers can recursively call back into the
@@ -100,21 +102,28 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         fetchJson,
         lookupIssuers,
         registries: call.registries ?? constructorRegistries,
+        recognizers,
       });
 
+      const additionalSuites = call.additionalSuites ?? [];
       const suites: VerificationSuite[] = [
         ...defaultSuites,
-        ...(call.additionalSuites ?? []),
+        ...additionalSuites,
       ];
+      const explicitSuiteIds = new Set(additionalSuites.map(s => s.id));
       const results = await runSuites(
         suites,
         { verifiableCredential: parsedCredential },
         ctx,
+        { explicitSuiteIds },
       );
 
+      const recognized = extractRecognition(results);
       return {
         verified: !hasFatalFailures(results),
         verifiableCredential: parsedCredential,
+        normalizedVerifiableCredential: recognized?.normalized,
+        recognizedProfile: recognized?.profile,
         results,
       };
     },
@@ -134,18 +143,22 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         fetchJson,
         lookupIssuers,
         registries: call.registries ?? constructorRegistries,
+        recognizers,
         challenge: call.challenge ?? null,
         unsignedPresentation: call.unsignedPresentation ?? false,
       });
 
+      const additionalSuites = call.additionalSuites ?? [];
       const presentationSuites: VerificationSuite[] = [
         proofSuite,
-        ...(call.additionalSuites ?? []),
+        ...additionalSuites,
       ];
+      const explicitSuiteIds = new Set(additionalSuites.map(s => s.id));
       const presentationResults = await runSuites(
         presentationSuites,
         { verifiablePresentation: parsedPresentation },
         ctx,
+        { explicitSuiteIds },
       );
 
       const credentials = extractCredentialsFrom(parsedPresentation);
@@ -188,6 +201,7 @@ interface BuildContextInput {
   fetchJson: VerificationContext['fetchJson'];
   lookupIssuers: VerificationContext['lookupIssuers'];
   registries?: EntityIdentityRegistry[];
+  recognizers?: RecognizerSpec[];
   challenge?: string | null;
   unsignedPresentation?: boolean;
 }
@@ -208,6 +222,7 @@ function buildContext(input: BuildContextInput): VerificationContext {
     cryptoServices: input.cryptoServices,
     cryptoSuites: defaultCryptoSuites(),
     registries: input.registries,
+    recognizers: input.recognizers,
     lookupIssuers: input.lookupIssuers,
     challenge: input.challenge ?? null,
     unsignedPresentation: input.unsignedPresentation ?? false,
@@ -216,6 +231,26 @@ function buildContext(input: BuildContextInput): VerificationContext {
 
 function hasFatalFailures(results: CheckResult[]): boolean {
   return results.some(r => r.fatal && r.outcome.status === 'failure');
+}
+
+/**
+ * Locate the `recognition.profile` success outcome in the result
+ * stream and lift its `payload` into the typed `RecognitionResult`
+ * the verifier surfaces as
+ * {@link CredentialVerificationResult.normalizedVerifiableCredential}.
+ *
+ * Returns `undefined` if recognition was skipped, failed, or the
+ * payload didn't materialize as expected (defensive against
+ * downstream check shape drift).
+ */
+function extractRecognition(
+  results: CheckResult[],
+): { profile: string; normalized: unknown } | undefined {
+  const result = results.find(r => r.check === 'recognition.profile');
+  if (!result || result.outcome.status !== 'success') return undefined;
+  const payload = result.outcome.payload as RecognitionResult | undefined;
+  if (!payload || payload.status !== 'recognized') return undefined;
+  return { profile: payload.profile, normalized: payload.normalized };
 }
 
 function parseErrorResult(problem: ProblemDetail): CheckResult {

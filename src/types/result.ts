@@ -17,6 +17,29 @@ export interface CredentialVerificationResult {
    */
   verifiableCredential: VerifiableCredential;
 
+  /**
+   * Normalized view of the credential, produced by a recognizer.
+   *
+   * Present when the `recognition.profile` check (in the default
+   * `recognitionSuite`) found a matching {@link RecognizerSpec}
+   * and that recognizer's parse step succeeded. Cast to the
+   * recognizer-specific shape based on {@link recognizedProfile}.
+   *
+   * @example
+   *   if (result.recognizedProfile === 'obv3p0.openbadge') {
+   *     const ob = result.normalizedVerifiableCredential as
+   *       Obv3p0OpenBadgeCredential;
+   *   }
+   */
+  normalizedVerifiableCredential?: unknown;
+
+  /**
+   * Stable id of the matched recognizer; mirrors
+   * {@link RecognizerSpec.id}. Present iff
+   * {@link normalizedVerifiableCredential} is.
+   */
+  recognizedProfile?: string;
+
   /** Flat array of results from all suites — every check that ran or was skipped. */
   results: CheckResult[];
 }

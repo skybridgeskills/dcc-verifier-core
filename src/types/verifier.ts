@@ -20,6 +20,7 @@ import type { DocumentLoader } from './context.js';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
 import type { EntityIdentityRegistry } from './registry.js';
 import type { VerificationSuite } from './check.js';
+import type { RecognizerSpec } from './recognition.js';
 import type { RegistryHandlerMap } from '../services/registry-handlers/types.js';
 import type {
   CredentialVerificationResult,
@@ -63,6 +64,22 @@ export interface VerifierConfig {
    * resolution semantics (e.g. a fixture map for offline tests).
    */
   documentLoader?: DocumentLoader;
+
+  /**
+   * Pluggable credential recognizers. The built-in
+   * `recognitionSuite` iterates these in registration order and
+   * surfaces the first applies-true match's normalized form on
+   * {@link CredentialVerificationResult.normalizedVerifiableCredential}
+   * + {@link CredentialVerificationResult.recognizedProfile}.
+   *
+   * Defaults to `[]` — recognition emits `'skipped'` and no
+   * normalized form is produced. The `verifier-core` package stays
+   * profile-agnostic by default; consumers wire OB recognition by
+   * importing `obv3p0Recognizer` from
+   * `@digitalcredentials/verifier-core/openbadges` and passing it
+   * here.
+   */
+  recognizers?: RecognizerSpec[];
 }
 
 /** Per-call inputs for `verifyCredential`. */

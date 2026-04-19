@@ -4,9 +4,17 @@
  * Run in order for every credential:
  *
  * 1. **core** — structure validation (context, VC context URI, credential id, proof exists)
- * 2. **proof** — cryptographic signature verification
- * 3. **status** — revocation/suspension via BitstringStatusList
- * 4. **registry** — issuer DID lookup in known registries
+ * 2. **recognition** — pluggable credential-profile recognition (no-op when no recognizers configured)
+ * 3. **proof** — cryptographic signature verification
+ * 4. **status** — revocation/suspension via BitstringStatusList
+ * 5. **registry** — issuer DID lookup in known registries (trust phase)
+ *
+ * The `recognitionSuite` runs after `core` so structurally
+ * malformed credentials don't reach recognition, and before `proof`
+ * so the normalized credential form is available to any later suite
+ * that wants to consult it. With no
+ * {@link VerifierConfig.recognizers} configured it emits `'skipped'`
+ * — zero behavior change for consumers who don't opt in.
  *
  * OpenBadges 3.0 verification (semantic checks and JSON Schema
  * validation) is opt-in and lives in the
@@ -15,9 +23,12 @@
  *
  * ```ts
  * import { createVerifier } from '@digitalcredentials/verifier-core';
- * import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges';
+ * import {
+ *   obv3p0Recognizer,
+ *   openBadgesSuite,
+ * } from '@digitalcredentials/verifier-core/openbadges';
  *
- * const verifier = createVerifier();
+ * const verifier = createVerifier({ recognizers: [obv3p0Recognizer] });
  * await verifier.verifyCredential({
  *   credential,
  *   additionalSuites: [openBadgesSuite],
@@ -30,12 +41,14 @@
 
 import { VerificationSuite } from './types/check.js';
 import { coreSuite } from './suites/core/index.js';
+import { recognitionSuite } from './suites/recognition/index.js';
 import { proofSuite } from './suites/proof/index.js';
 import { statusSuite } from './suites/status/index.js';
 import { registrySuite } from './suites/registry/index.js';
 
 export const defaultSuites: VerificationSuite[] = [
   coreSuite,
+  recognitionSuite,
   proofSuite,
   statusSuite,
   registrySuite,

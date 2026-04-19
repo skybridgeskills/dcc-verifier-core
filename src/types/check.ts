@@ -27,7 +27,7 @@ import type { VerificationContext } from './context.js';
  * Throws are reserved for unexpected infrastructure errors.
  */
 export type CheckOutcome =
-  | { status: 'success'; message: string }
+  | { status: 'success'; message: string; payload?: unknown }
   | { status: 'failure'; problems: ProblemDetail[] }
   | { status: 'skipped'; reason: string };
 
@@ -96,4 +96,16 @@ export interface VerificationSuite {
   name: string;
   description?: string;
   checks: VerificationCheck[];
+  /**
+   * Optional predicate gating whether this suite runs against the
+   * given subject. When false, the orchestrator silently skips —
+   * unless the consumer explicitly queued the suite via
+   * `additionalSuites`, in which case a synthetic
+   * `<suite-id>.applies` `'skipped'` `CheckResult` is emitted so
+   * the consumer sees their explicit request was dropped.
+   */
+  applies?: (
+    subject: VerificationSubject,
+    context: VerificationContext,
+  ) => boolean;
 }

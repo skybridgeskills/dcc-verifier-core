@@ -55,6 +55,8 @@ export {
   isEndorsementCredential,
 } from './recognize.js';
 
+export { obv3p0Recognizer } from './recognizers.js';
+
 export {
   Obv3ProblemTypes as OpenBadgesProblemTypes,
   Obv3ProblemTypes,

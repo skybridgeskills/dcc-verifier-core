@@ -2,8 +2,9 @@
  * Suite orchestration engine.
  *
  * `runSuites` is the core loop of the verification pipeline: it iterates
- * suites in order, runs each check, respects `appliesTo` filtering and
- * `fatal` short-circuiting, and returns a flat `CheckResult[]` report.
+ * suites in order, applies any per-suite `applies` predicate, runs each
+ * check, respects `appliesTo` filtering and `fatal` short-circuiting,
+ * and returns a flat `CheckResult[]` report.
  *
  * This module is pure orchestration — it has no knowledge of what any
  * check actually does.
@@ -12,6 +13,20 @@
 import { VerificationSuite, VerificationCheck, CheckResult, CheckOutcome } from './types/check.js';
 import { VerificationContext } from './types/context.js';
 import { VerificationSubject } from './types/subject.js';
+
+/**
+ * Optional orchestration knobs.
+ *
+ * - `explicitSuiteIds`: ids of suites the consumer queued
+ *   themselves (typically via `additionalSuites`). When a suite's
+ *   `applies` predicate returns false, suites in this set still
+ *   surface a synthetic `<suite-id>.applies` `'skipped'`
+ *   `CheckResult` so the consumer sees their explicit request was
+ *   dropped. Suites not in this set silently skip.
+ */
+export interface RunSuitesOptions {
+  explicitSuiteIds?: ReadonlySet<string>;
+}
 
 /**
  * Check if a verification check applies to the given subject.
@@ -37,19 +52,39 @@ function appliesToSubject(check: VerificationCheck, subject: VerificationSubject
 /**
  * Run a list of verification suites sequentially against a subject.
  *
- * - Checks are executed in order within each suite
- * - Checks with `appliesTo` restrictions are skipped if they don't match the subject
- * - Fatal failures stop remaining checks in that suite only (other suites continue)
- * - Returns a flat array of all check results
+ * - Suites with an `applies` predicate that returns false are
+ *   silently skipped, except when their id appears in
+ *   `options.explicitSuiteIds` — in which case a synthetic
+ *   `<suite-id>.applies` `'skipped'` `CheckResult` is emitted.
+ * - Checks are executed in order within each suite.
+ * - Checks with `appliesTo` restrictions are skipped if they don't match the subject.
+ * - Fatal failures stop remaining checks in that suite only (other suites continue).
+ * - Returns a flat array of all check results.
  */
 export async function runSuites(
   suites: VerificationSuite[],
   subject: VerificationSubject,
-  context: VerificationContext
+  context: VerificationContext,
+  options: RunSuitesOptions = {},
 ): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
 
   for (const suite of suites) {
+    if (suite.applies && !suite.applies(subject, context)) {
+      if (options.explicitSuiteIds?.has(suite.id)) {
+        results.push({
+          check: `${suite.id}.applies`,
+          suite: suite.id,
+          outcome: {
+            status: 'skipped',
+            reason: 'suite predicate returned false',
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+      continue;
+    }
+
     for (const check of suite.checks) {
       // Skip checks that don't apply to this subject type
       if (check.appliesTo && !appliesToSubject(check, subject)) {

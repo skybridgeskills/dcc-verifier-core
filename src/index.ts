@@ -33,6 +33,7 @@ export type { HttpGetResult } from './types/http.js';
 export type { CryptoService, CryptoResult, CryptoVerifyOptions } from './types/crypto-service.js';
 export type { CryptoSuite, LinkedDataSuite, DataIntegritySuite, ProofPurpose } from './types/crypto-suite.js';
 export type { VerificationSubject } from './types/subject.js';
+export type { RecognizerSpec, RecognitionResult } from './types/recognition.js';
 
 // ==================== Service Interfaces ====================
 
@@ -53,6 +54,11 @@ export { coreSuite } from './suites/core/index.js';
 export { proofSuite } from './suites/proof/index.js';
 export { statusSuite } from './suites/status/index.js';
 export { registrySuite } from './suites/registry/index.js';
+export { recognitionSuite } from './suites/recognition/index.js';
+
+// ==================== Utilities ====================
+
+export { formatJsonPointer } from './util/json-pointer.js';
 
 // ==================== Extension points ====================
 
