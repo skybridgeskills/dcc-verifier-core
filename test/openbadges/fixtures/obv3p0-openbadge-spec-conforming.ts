@@ -25,6 +25,11 @@ export const obv3p0OpenBadgeSpecConforming: Record<string, unknown> = {
     name: 'Spec-Conforming Issuer',
   },
   validFrom: '2024-01-01T00:00:00Z',
+  image: {
+    id: 'https://example.test/badge.png',
+    type: ['Image'],
+    caption: 'Spec-conforming badge image',
+  },
   credentialSubject: {
     id: 'did:example:recipient',
     type: ['AchievementSubject'],

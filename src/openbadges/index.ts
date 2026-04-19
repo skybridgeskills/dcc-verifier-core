@@ -63,6 +63,9 @@ export {
 } from './schemas/openbadge-credential-v3p0.js';
 export type { Obv3p0OpenBadgeCredential } from './schemas/openbadge-credential-v3p0.js';
 
+export { Obv3p0ImageSchema, ImageField } from './schemas/classes-v3p0.js';
+export type { Obv3p0Image } from './schemas/classes-v3p0.js';
+
 export {
   Obv3ProblemTypes as OpenBadgesProblemTypes,
   Obv3ProblemTypes,
