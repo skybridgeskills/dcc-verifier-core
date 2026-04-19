@@ -4,8 +4,8 @@
  * Curated re-exports for OpenBadges 3.0 verification. Importing this
  * submodule does **not** affect the default verifier behavior — every
  * suite, check, and helper exported here is opt-in and must be
- * passed explicitly to `createVerifier({ additionalSuites: [...] })`
- * or composed into a custom suite.
+ * passed explicitly via a verify call's `additionalSuites` (or
+ * composed into a custom suite).
  *
  * Surface follows the design in
  * `docs/plans/2026-04-18-openbadges-module/00-design.md`:

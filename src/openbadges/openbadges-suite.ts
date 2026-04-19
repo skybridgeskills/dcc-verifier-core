@@ -2,7 +2,7 @@
  * Three opt-in OpenBadges verification suite bundles.
  *
  * Consumers compose verifier configurations by passing one (or more)
- * of these to `createVerifier({ additionalSuites: [...] })`:
+ * of these to a verify call's `additionalSuites`:
  *
  * - {@link openBadgesSemanticSuite} — fast, in-process Zod-based
  *   cross-field semantic checks. **No network access required.**
@@ -24,7 +24,11 @@
  * import { createVerifier } from '@digitalcredentials/verifier-core';
  * import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges';
  *
- * const verifier = createVerifier({ additionalSuites: [openBadgesSuite] });
+ * const verifier = createVerifier();
+ * await verifier.verifyCredential({
+ *   credential,
+ *   additionalSuites: [openBadgesSuite],
+ * });
  * ```
  */
 

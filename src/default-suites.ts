@@ -17,7 +17,11 @@
  * import { createVerifier } from '@digitalcredentials/verifier-core';
  * import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges';
  *
- * const verifier = createVerifier({ additionalSuites: [openBadgesSuite] });
+ * const verifier = createVerifier();
+ * await verifier.verifyCredential({
+ *   credential,
+ *   additionalSuites: [openBadgesSuite],
+ * });
  * ```
  *
  * `proofSuite` is statically imported here so the verifier has no

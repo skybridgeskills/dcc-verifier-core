@@ -77,8 +77,3 @@ export const Obv3CredentialSubjectShape = z
     result: z.array(Obv3ResultShape).optional(),
   })
   .passthrough();
-
-export type Obv3ResultDescriptionShape = z.infer<typeof Obv3ResultDescriptionShape>;
-export type Obv3ResultShape = z.infer<typeof Obv3ResultShape>;
-export type Obv3AchievementShape = z.infer<typeof Obv3AchievementShape>;
-export type Obv3CredentialSubjectShape = z.infer<typeof Obv3CredentialSubjectShape>;
