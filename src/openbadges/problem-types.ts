@@ -35,6 +35,19 @@ export const Obv3ProblemTypes = {
    */
   OB_INVALID_ACHIEVED_LEVEL:
     'https://www.w3.org/TR/vc-data-model#OB_INVALID_ACHIEVED_LEVEL',
+
+  /**
+   * Synthesized — a `Result` whose linked `ResultDescription` has
+   * `resultType: 'Status'` is missing the `status` field (or has it
+   * as an empty string). The Status `resultType` declares that the
+   * issuer intends to record a status value (`Completed`, `Failed`,
+   * `Pending`, `InProgress`, `Withdrawn`, etc.); absence of `status`
+   * in that case is a data-integrity violation.
+   *
+   * Spec anchor: OBv3 §B.1.16 / §B.1.18.
+   */
+  OB_MISSING_RESULT_STATUS:
+    'https://www.w3.org/TR/vc-data-model#OB_MISSING_RESULT_STATUS',
 } as const;
 
 export type Obv3ProblemType =
