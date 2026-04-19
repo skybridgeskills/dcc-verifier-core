@@ -250,7 +250,7 @@ describe('OBv3 Schema Suite', () => {
       expect(refCheck?.outcome.status).to.equal('failure');
       if (refCheck?.outcome.status === 'failure') {
         expect(refCheck.outcome.problems[0].type).to.equal(
-          'https://www.w3.org/TR/vc-data-model#OBV3_INVALID_RESULT_REFERENCE',
+          'https://www.w3.org/TR/vc-data-model#OB_INVALID_RESULT_REFERENCE',
         );
         expect(refCheck.outcome.problems[0].detail).to.include('does not exist');
       }
@@ -347,7 +347,7 @@ describe('OBv3 Schema Suite', () => {
       expect(refCheck?.outcome.status).to.equal('failure');
       if (refCheck?.outcome.status === 'failure') {
         expect(refCheck.outcome.problems[0].type).to.equal(
-          'https://www.w3.org/TR/vc-data-model#OBV3_INVALID_RESULT_REFERENCE',
+          'https://www.w3.org/TR/vc-data-model#OB_INVALID_RESULT_REFERENCE',
         );
       }
     });

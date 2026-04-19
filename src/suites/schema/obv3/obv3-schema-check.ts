@@ -5,9 +5,10 @@ import { ProblemDetail } from '../../../types/problem-detail.js';
 import { VerificationSubject } from '../../../types/subject.js';
 import { VerificationContext } from '../../../types/context.js';
 import { ProblemTypes } from '../../../problem-types.js';
-
-// OBv3 context matcher
-const OBV3_0_3_CONTEXT_MATCHER = 'https://purl.imsglobal.org/spec/ob/v3p0/context-3';
+import {
+  isOpenBadgeCredential,
+  isEndorsementCredential,
+} from '../../../openbadges/recognize.js';
 
 // OBv3 schema URLs
 const OBV3_SCHEMA_V1_ACHIEVEMENT = 'https://purl.imsglobal.org/spec/ob/v3p0/schema/json-ld/ob_v3p0_anyachievementcredential_schema.json';
@@ -36,33 +37,6 @@ async function validateAgainstSchema(
     instancePath: e.instancePath || '',
   }));
   return { valid, errors };
-}
-
-/**
- * Determine if credential is an OBv3 credential.
- */
-function isObv3Credential(credential: Record<string, unknown>): boolean {
-  const contexts = credential['@context'] as unknown[] | undefined;
-  if (!Array.isArray(contexts)) {
-    return false;
-  }
-
-  const stringContexts = contexts.filter((ctx): ctx is string => typeof ctx === 'string');
-  return stringContexts.some(ctx => ctx.startsWith(OBV3_0_3_CONTEXT_MATCHER));
-}
-
-/**
- * Check if credential type includes specific OBv3 types.
- */
-function hasObv3Type(credential: Record<string, unknown>, typeName: string): boolean {
-  const types = credential.type as unknown[] | string | undefined;
-  if (typeof types === 'string') {
-    return types === typeName;
-  }
-  if (Array.isArray(types)) {
-    return types.some(t => t === typeName);
-  }
-  return false;
 }
 
 /**
@@ -104,11 +78,6 @@ function selectObv3Schema(credential: Record<string, unknown>): { schema: string
   }
   // fall through - no valid credentialSchema found
 
-  // No credentialSchema specified, try to infer from context and type
-  if (!isObv3Credential(credential)) {
-    return null;
-  }
-
   const vcVersion = getVcVersion(credential);
   if (!vcVersion) {
     return null;
@@ -117,10 +86,10 @@ function selectObv3Schema(credential: Record<string, unknown>): { schema: string
   let schema: string | null = null;
   let obType = '';
 
-  if (hasObv3Type(credential, 'OpenBadgeCredential')) {
+  if (isOpenBadgeCredential(credential)) {
     obType = 'OpenBadgeCredential';
     schema = vcVersion === 'v1' ? OBV3_SCHEMA_V1_ACHIEVEMENT : OBV3_SCHEMA_V2_ACHIEVEMENT;
-  } else if (hasObv3Type(credential, 'EndorsementCredential')) {
+  } else if (isEndorsementCredential(credential)) {
     obType = 'EndorsementCredential';
     schema = vcVersion === 'v1' ? OBV3_SCHEMA_V1_ENDORSEMENT : OBV3_SCHEMA_V2_ENDORSEMENT;
   }

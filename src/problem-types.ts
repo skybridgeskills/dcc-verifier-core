@@ -28,9 +28,14 @@
  * custom suites that emit their own problem URIs. `ProblemType`
  * (below) is a convenience union for callers that only branch on
  * built-in types.
+ *
+ * **Vertical / opt-in catalogs.** Problem types emitted by opt-in
+ * verification submodules live in their own catalogs and are not
+ * mirrored here. For example, OpenBadges types live in
+ * `src/openbadges/problem-types.ts` and are exported via the
+ * `@digitalcredentials/verifier-core/openbadges` submodule barrel as
+ * `OpenBadgesProblemTypes`.
  */
-
-import { Obv3ProblemTypes } from './suites/schema/obv3/problem-types.js';
 
 export const ProblemTypes = {
   /** Spec — input could not be parsed. (W3C VC Data Model 2.0 §7.1) */
@@ -75,9 +80,6 @@ export const ProblemTypes = {
   STATUS_LIST_ERROR: 'https://www.w3.org/TR/vc-data-model#STATUS_LIST_ERROR',
   /** Synthesized — status list bit indicates revocation or suspension. */
   CREDENTIAL_REVOKED_OR_SUSPENDED: 'https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED',
-
-  /** OBv3 — defined in `suites/schema/obv3/problem-types.ts`; re-exported for catalog convenience. */
-  OBV3_INVALID_RESULT_REFERENCE: Obv3ProblemTypes.OBV3_INVALID_RESULT_REFERENCE,
 } as const;
 
 export type ProblemType = typeof ProblemTypes[keyof typeof ProblemTypes];

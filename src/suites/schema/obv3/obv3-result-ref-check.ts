@@ -2,7 +2,7 @@ import { VerificationCheck, CheckOutcome } from '../../../types/check.js';
 import { ProblemDetail } from '../../../types/problem-detail.js';
 import { VerificationSubject } from '../../../types/subject.js';
 import { VerificationContext } from '../../../types/context.js';
-import { Obv3ProblemTypes } from './problem-types.js';
+import { Obv3ProblemTypes } from '../../../openbadges/problem-types.js';
 
 /**
  * Result entry with resultDescription reference.
@@ -128,7 +128,7 @@ export const obv3ResultRefCheck: VerificationCheck = {
 
     if (invalidRefs.length > 0) {
       const problems: ProblemDetail[] = invalidRefs.map(({ index, ref }) => ({
-        type: Obv3ProblemTypes.OBV3_INVALID_RESULT_REFERENCE,
+        type: Obv3ProblemTypes.OB_INVALID_RESULT_REFERENCE,
         title: 'Invalid Result Reference',
         detail: `Result entry at index ${index} references ResultDescription id "${ref}" which does not exist in achievement.resultDescription`,
       }));
