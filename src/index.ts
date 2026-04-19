@@ -26,7 +26,7 @@ export type {
 
 // ==================== Core Types ====================
 
-export type { CheckResult, CheckOutcome, VerificationCheck, VerificationSuite, VerificationSubjectType } from './types/check.js';
+export type { CheckResult, CheckOutcome, VerificationCheck, VerificationSuite, VerificationSubjectType, SuitePhase } from './types/check.js';
 export type { ProblemDetail } from './types/problem-detail.js';
 export type { VerificationContext, DocumentLoader, FetchJson } from './types/context.js';
 export type { HttpGetResult } from './types/http.js';

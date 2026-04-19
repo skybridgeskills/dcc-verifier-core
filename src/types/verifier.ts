@@ -19,7 +19,7 @@ import type { CryptoService } from './crypto-service.js';
 import type { DocumentLoader } from './context.js';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
 import type { EntityIdentityRegistry } from './registry.js';
-import type { VerificationSuite } from './check.js';
+import type { SuitePhase, VerificationSuite } from './check.js';
 import type { RecognizerSpec } from './recognition.js';
 import type { RegistryHandlerMap } from '../services/registry-handlers/types.js';
 import type {
@@ -80,6 +80,22 @@ export interface VerifierConfig {
    * here.
    */
   recognizers?: RecognizerSpec[];
+
+  /**
+   * Default suite-phase filter for every call on this verifier. Per-call
+   * `phases` overrides this. Unset (the default) runs all phases
+   * exactly as prior `verifier-core` versions did.
+   *
+   * When set, only suites whose `phase` matches one of the requested
+   * phases run (untagged suites bypass the filter). Requesting
+   * `'semantic'` automatically includes `'recognition'` so semantic
+   * checks have access to the normalized credential form.
+   *
+   * Result objects produced under a non-default phase set carry
+   * `partial: true`. See {@link SuitePhase} for the canonical
+   * two-pass workflow.
+   */
+  phases?: SuitePhase[];
 }
 
 /** Per-call inputs for `verifyCredential`. */
@@ -97,6 +113,12 @@ export interface VerifyCredentialCall {
    * used by the `vc-recognition` handler to break recursion.
    */
   registries?: EntityIdentityRegistry[];
+
+  /**
+   * Override the constructor's `phases` for this single call. See
+   * {@link VerifierConfig.phases}.
+   */
+  phases?: SuitePhase[];
 }
 
 /** Per-call inputs for `verifyPresentation`. */
@@ -115,6 +137,9 @@ export interface VerifyPresentationCall {
 
   /** Override the constructor's `registries` for this single call. See {@link VerifyCredentialCall.registries}. */
   registries?: EntityIdentityRegistry[];
+
+  /** Override the constructor's `phases` for this single call. See {@link VerifierConfig.phases}. */
+  phases?: SuitePhase[];
 }
 
 /**

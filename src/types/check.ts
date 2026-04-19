@@ -64,6 +64,39 @@ export interface CheckResult {
 export type VerificationSubjectType = 'verifiableCredential' | 'verifiablePresentation';
 
 /**
+ * Suite-phase classification for the two-pass verification workflow.
+ *
+ * Lets consumers run subsets of the pipeline by passing
+ * `phases: [...]` on `VerifierConfig` or per-call. Untagged suites
+ * bypass the filter (run in every phase request) — every built-in
+ * suite is required to be tagged so the filter is meaningful.
+ *
+ * - **cryptographic** — structural + signature + status; the work
+ *   that must happen first to establish the credential is what it
+ *   says it is.
+ * - **trust** — trust-layer evaluations like issuer / DID registry
+ *   recognition (currently {@link registrySuite}; expected to grow
+ *   as additional trust signals are added).
+ * - **recognition** — pluggable credential recognition; produces
+ *   the normalized credential form. Auto-included when `'semantic'`
+ *   is requested (semantic checks may consume the normalized form).
+ * - **semantic** — content-aware semantic checks (e.g. OB
+ *   cross-field, future verticals).
+ *
+ * The canonical use case is a two-pass workflow:
+ * 1. First pass with no `phases` (or `['cryptographic', 'trust']`)
+ *    — full crypto verification of a presentation and its embedded
+ *    credentials.
+ * 2. Second pass with `phases: ['semantic']` and the
+ *    profile-specific suites in `additionalSuites` — re-runs only
+ *    the semantic work (recognition is auto-included).
+ *
+ * The union of both passes' `results` is what a single full-phase
+ * pass would have produced.
+ */
+export type SuitePhase = 'cryptographic' | 'trust' | 'recognition' | 'semantic';
+
+/**
  * A single verification check — the smallest unit of verification logic.
  *
  * Checks are pure async functions: given a subject and context, they return
@@ -108,4 +141,11 @@ export interface VerificationSuite {
     subject: VerificationSubject,
     context: VerificationContext,
   ) => boolean;
+  /**
+   * Suite-phase tag for the two-pass verification filter; see
+   * {@link SuitePhase}. Untagged suites bypass the filter (run in
+   * every phase request). All built-in suites are required to be
+   * tagged so a `phases:` request reliably partitions them.
+   */
+  phase?: SuitePhase;
 }

@@ -35,7 +35,11 @@ import type {
   VerifyPresentationCall,
 } from './types/verifier.js';
 import type { VerificationContext } from './types/context.js';
-import type { VerificationSuite, CheckResult } from './types/check.js';
+import type {
+  VerificationSuite,
+  CheckResult,
+  SuitePhase,
+} from './types/check.js';
 import type { RecognitionResult, RecognizerSpec } from './types/recognition.js';
 import type {
   CredentialVerificationResult,
@@ -68,6 +72,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
   const fetchJson = fetchJsonFromHttpGet(httpGetService);
   const constructorRegistries = config.registries;
   const recognizers = config.recognizers ?? [];
+  const constructorPhases = config.phases;
 
   // Forward-declared verifier reference. The lookupIssuers thunk closes
   // over this slot so handlers can recursively call back into the
@@ -111,21 +116,25 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         ...additionalSuites,
       ];
       const explicitSuiteIds = new Set(additionalSuites.map(s => s.id));
+      const requestedPhases = call.phases ?? constructorPhases;
+      const effectivePhases = expandPhases(requestedPhases);
       const results = await runSuites(
         suites,
         { verifiableCredential: parsedCredential },
         ctx,
-        { explicitSuiteIds },
+        { explicitSuiteIds, phases: effectivePhases },
       );
 
       const recognized = extractRecognition(results);
-      return {
+      const result: CredentialVerificationResult = {
         verified: !hasFatalFailures(results),
         verifiableCredential: parsedCredential,
         normalizedVerifiableCredential: recognized?.normalized,
         recognizedProfile: recognized?.profile,
         results,
       };
+      if (requestedPhases !== undefined) result.partial = true;
+      return result;
     },
 
     verifyPresentation: async (call: VerifyPresentationCall) => {
@@ -154,11 +163,13 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         ...additionalSuites,
       ];
       const explicitSuiteIds = new Set(additionalSuites.map(s => s.id));
+      const requestedPhases = call.phases ?? constructorPhases;
+      const effectivePhases = expandPhases(requestedPhases);
       const presentationResults = await runSuites(
         presentationSuites,
         { verifiablePresentation: parsedPresentation },
         ctx,
-        { explicitSuiteIds },
+        { explicitSuiteIds, phases: effectivePhases },
       );
 
       const credentials = extractCredentialsFrom(parsedPresentation);
@@ -172,6 +183,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
               // Forward override only; if undefined, the constructor
               // default reapplies inside the recursive call.
               registries: call.registries,
+              phases: call.phases,
             }),
           );
         }
@@ -180,12 +192,14 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
       const presentationVerified = !hasFatalFailures(presentationResults);
       const allCredentialsVerified = credentialResults.every(cr => cr.verified);
 
-      return {
+      const result: PresentationVerificationResult = {
         verified: presentationVerified && allCredentialsVerified,
         verifiablePresentation: parsedPresentation,
         presentationResults,
         credentialResults,
       };
+      if (requestedPhases !== undefined) result.partial = true;
+      return result;
     },
   };
 
@@ -231,6 +245,26 @@ function buildContext(input: BuildContextInput): VerificationContext {
 
 function hasFatalFailures(results: CheckResult[]): boolean {
   return results.some(r => r.fatal && r.outcome.status === 'failure');
+}
+
+/**
+ * Apply the auto-include rule for phase requests: if `'semantic'`
+ * is requested without `'recognition'`, add `'recognition'` so
+ * semantic checks have access to the normalized credential form
+ * the recognizer produces.
+ *
+ * `undefined` (the default — all phases) is passed through
+ * unchanged. No deduplication is performed beyond the auto-include
+ * itself; consumers that pass duplicates get duplicates.
+ */
+function expandPhases(
+  requested: SuitePhase[] | undefined,
+): SuitePhase[] | undefined {
+  if (requested === undefined) return undefined;
+  if (requested.includes('semantic') && !requested.includes('recognition')) {
+    return [...requested, 'recognition'];
+  }
+  return requested;
 }
 
 /**

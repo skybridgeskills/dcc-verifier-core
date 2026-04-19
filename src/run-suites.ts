@@ -10,7 +10,13 @@
  * check actually does.
  */
 
-import { VerificationSuite, VerificationCheck, CheckResult, CheckOutcome } from './types/check.js';
+import {
+  VerificationSuite,
+  VerificationCheck,
+  CheckResult,
+  CheckOutcome,
+  SuitePhase,
+} from './types/check.js';
 import { VerificationContext } from './types/context.js';
 import { VerificationSubject } from './types/subject.js';
 
@@ -23,9 +29,31 @@ import { VerificationSubject } from './types/subject.js';
  *   surface a synthetic `<suite-id>.applies` `'skipped'`
  *   `CheckResult` so the consumer sees their explicit request was
  *   dropped. Suites not in this set silently skip.
+ * - `phases`: when set, only suites whose `phase` matches one of
+ *   the requested phases run. Untagged suites bypass the filter
+ *   (run in every phase request); this is intentional so consumer
+ *   suites added via `additionalSuites` without a phase tag still
+ *   execute regardless of the filter. The `recognition` auto-include
+ *   when `'semantic'` is requested is the verifier-layer's
+ *   responsibility, not this function's — pass an already-expanded
+ *   list.
  */
 export interface RunSuitesOptions {
   explicitSuiteIds?: ReadonlySet<string>;
+  phases?: SuitePhase[];
+}
+
+/**
+ * Whether a suite is permitted to run under the current
+ * phase filter. See {@link RunSuitesOptions.phases}.
+ */
+function suiteRunsInPhases(
+  suite: VerificationSuite,
+  phases: SuitePhase[] | undefined,
+): boolean {
+  if (phases === undefined) return true;
+  if (suite.phase === undefined) return true;
+  return phases.includes(suite.phase);
 }
 
 /**
@@ -52,6 +80,11 @@ function appliesToSubject(check: VerificationCheck, subject: VerificationSubject
 /**
  * Run a list of verification suites sequentially against a subject.
  *
+ * - Suites whose `phase` is excluded by `options.phases` are
+ *   silently skipped (no synthetic result emitted, even when the
+ *   suite is in `explicitSuiteIds` — the consumer asked for a
+ *   subset and will see only that subset). Untagged suites bypass
+ *   the phase filter.
  * - Suites with an `applies` predicate that returns false are
  *   silently skipped, except when their id appears in
  *   `options.explicitSuiteIds` — in which case a synthetic
@@ -70,6 +103,8 @@ export async function runSuites(
   const results: CheckResult[] = [];
 
   for (const suite of suites) {
+    if (!suiteRunsInPhases(suite, options.phases)) continue;
+
     if (suite.applies && !suite.applies(subject, context)) {
       if (options.explicitSuiteIds?.has(suite.id)) {
         results.push({

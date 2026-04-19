@@ -63,6 +63,7 @@ export const openBadgesSemanticSuite: VerificationSuite = {
   name: 'OpenBadges Semantic',
   description:
     'OpenBadges 3.0 cross-field semantic checks (no JSON Schema fetch).',
+  phase: 'semantic',
   applies: appliesToOpenBadge,
   checks: [
     obv3ResultRefCheck,
@@ -77,6 +78,7 @@ export const openBadgesSchemaSuite: VerificationSuite = {
   name: 'OpenBadges JSON Schema',
   description:
     'AJV-backed validation against the published OBv3 JSON Schemas.',
+  phase: 'semantic',
   applies: appliesToOpenBadge,
   checks: [obv3SchemaCheck],
 };
@@ -86,6 +88,7 @@ export const openBadgesSuite: VerificationSuite = {
   name: 'OpenBadges',
   description:
     'OpenBadges 3.0 verification: semantic checks plus JSON Schema validation.',
+  phase: 'semantic',
   applies: appliesToOpenBadge,
   checks: [
     ...openBadgesSemanticSuite.checks,

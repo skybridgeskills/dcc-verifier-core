@@ -1,13 +1,15 @@
 /**
  * Default verification suites used by `createVerifier`.
  *
- * Run in order for every credential:
+ * Run in order for every credential, with each suite's `phase` tag
+ * shown in parentheses (the tag drives the two-pass `phases:`
+ * filter on `VerifierConfig`; see {@link SuitePhase}):
  *
- * 1. **core** — structure validation (context, VC context URI, credential id, proof exists)
- * 2. **recognition** — pluggable credential-profile recognition (no-op when no recognizers configured)
- * 3. **proof** — cryptographic signature verification
- * 4. **status** — revocation/suspension via BitstringStatusList
- * 5. **registry** — issuer DID lookup in known registries (trust phase)
+ * 1. **core** (cryptographic) — structure validation (context, VC context URI, credential id, proof exists)
+ * 2. **recognition** (recognition) — pluggable credential-profile recognition (no-op when no recognizers configured)
+ * 3. **proof** (cryptographic) — cryptographic signature verification
+ * 4. **status** (cryptographic) — revocation/suspension via BitstringStatusList
+ * 5. **registry** (trust) — issuer DID lookup in known registries
  *
  * The `recognitionSuite` runs after `core` so structurally
  * malformed credentials don't reach recognition, and before `proof`

@@ -19,5 +19,6 @@ export const coreSuite: VerificationSuite = {
   id: 'core',
   name: 'Core Structure',
   description: 'Validates basic credential structure before cryptographic verification.',
+  phase: 'cryptographic',
   checks: [contextCheck, vcContextCheck, credentialIdCheck, proofExistsCheck],
 };

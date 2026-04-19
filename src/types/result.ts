@@ -42,6 +42,19 @@ export interface CredentialVerificationResult {
 
   /** Flat array of results from all suites — every check that ran or was skipped. */
   results: CheckResult[];
+
+  /**
+   * `true` when this result was produced under a non-default
+   * suite-phase filter (i.e. the consumer passed `phases: [...]` on
+   * `VerifierConfig` or per-call). A partial result carries only
+   * the subset of suites in the requested phases, plus any
+   * untagged suites; consumers running a two-pass workflow union
+   * the per-pass `results` arrays to reconstruct the full report.
+   *
+   * Unset for the default (all-phases) case so existing consumers
+   * see no change in result shape.
+   */
+  partial?: boolean;
 }
 
 export interface PresentationVerificationResult {
@@ -63,4 +76,11 @@ export interface PresentationVerificationResult {
 
   /** Individual credential verification results, one per embedded VC. */
   credentialResults: CredentialVerificationResult[];
+
+  /**
+   * `true` when this result was produced under a non-default
+   * suite-phase filter; mirrors
+   * {@link CredentialVerificationResult.partial}.
+   */
+  partial?: boolean;
 }
