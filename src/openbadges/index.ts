@@ -55,13 +55,26 @@ export {
   isEndorsementCredential,
 } from './recognize.js';
 
-export { obv3p0Recognizer } from './recognizers.js';
+export {
+  obv3p0Recognizer,
+  obv3p0EndorsementRecognizer,
+} from './recognizers.js';
 
 export {
   Obv3p0OpenBadgeCredentialSchema,
   parseObv3p0OpenBadgeCredential,
 } from './schemas/openbadge-credential-v3p0.js';
 export type { Obv3p0OpenBadgeCredential } from './schemas/openbadge-credential-v3p0.js';
+
+export {
+  Obv3p0EndorsementCredentialSchema,
+  Obv3p0EndorsementSubjectSchema,
+  parseObv3p0EndorsementCredential,
+} from './schemas/endorsement-credential-v3p0.js';
+export type {
+  Obv3p0EndorsementCredential,
+  Obv3p0EndorsementSubject,
+} from './schemas/endorsement-credential-v3p0.js';
 
 export {
   Obv3p0ImageSchema,

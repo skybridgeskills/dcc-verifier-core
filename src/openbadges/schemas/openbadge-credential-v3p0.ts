@@ -14,32 +14,19 @@ import { z } from 'zod';
 import {
   IriString,
   JsonLdTypeField,
-  OB_3_0_CONTEXT_PREFIX,
+  Obv3p0ContextArray,
   VCDM_V1_CONTEXT,
   VCDM_V2_CONTEXT,
+  zodErrorToProblems,
 } from './fields-v3p0.js';
 import {
   ImageField,
   Obv3p0AchievementSubjectSchema,
   ProfileRefField,
 } from './classes-v3p0.js';
-import type { ProblemDetail } from '../../types/problem-detail.js';
 import type { RecognitionResult } from '../../types/recognition.js';
-import { formatJsonPointer } from '../../util/json-pointer.js';
 
 const OBV3P0_OPENBADGE_PROFILE = 'obv3p0.openbadge';
-
-const ContextArray = z
-  .array(z.string())
-  .min(1, '@context must be a non-empty array')
-  .refine(
-    arr => arr[0] === VCDM_V1_CONTEXT || arr[0] === VCDM_V2_CONTEXT,
-    { message: '@context[0] must be a VCDM context (v1 or v2)' },
-  )
-  .refine(
-    arr => arr.some(c => c.startsWith(OB_3_0_CONTEXT_PREFIX)),
-    { message: `@context must include the OB 3.0 context (${OB_3_0_CONTEXT_PREFIX}*)` },
-  );
 
 const TypeField = JsonLdTypeField(['VerifiableCredential']).superRefine(
   (arr, ctx) => {
@@ -70,7 +57,7 @@ const TypeField = JsonLdTypeField(['VerifiableCredential']).superRefine(
  */
 export const Obv3p0OpenBadgeCredentialSchema: z.ZodTypeAny = z
   .object({
-    '@context': ContextArray,
+    '@context': Obv3p0ContextArray,
     id: IriString,
     type: TypeField,
     issuer: ProfileRefField(),
@@ -134,21 +121,4 @@ export function parseObv3p0OpenBadgeCredential(
     profile: OBV3P0_OPENBADGE_PROFILE,
     problems: zodErrorToProblems(parsed.error),
   };
-}
-
-const OB_MALFORMED_ENVELOPE_TYPE =
-  'urn:dcc-verifier:openbadges:malformed-envelope';
-
-function zodErrorToProblems(error: z.ZodError): ProblemDetail[] {
-  return error.issues.map(issue => {
-    const detail: ProblemDetail = {
-      type: OB_MALFORMED_ENVELOPE_TYPE,
-      title: 'Malformed Open Badges 3.0 Envelope',
-      detail: issue.message,
-    };
-    if (issue.path.length > 0) {
-      detail.instance = formatJsonPointer(issue.path);
-    }
-    return detail;
-  });
 }
