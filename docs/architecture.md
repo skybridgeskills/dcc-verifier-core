@@ -26,7 +26,7 @@ src/
 ├── index.ts                         Public API barrel (all exports)
 ├── verifier.ts                      createVerifier(config) factory + internal context builder (composition root)
 ├── verify-suite.ts                  Standalone verifyCredential / verifyPresentation wrappers over createVerifier
-├── default-suites.ts                Internal: defaultSuites array (core → proof → status → registry → schema.obv3)
+├── default-suites.ts                Internal: defaultSuites array (core → proof → status → registry); Open Badges suites are opt-in via the `/openbadges` submodule
 ├── default-services.ts              Internal: lazy factories for default httpGetService, cryptoServices, documentLoader (memoized) + per-call createDefaultCacheService
 ├── run-suites.ts                    Suite orchestration engine
 ├── extract-credentials-from.ts      Normalize VP's embedded credentials to array
@@ -51,12 +51,23 @@ src/
 │       ├── oidf-handler.ts          OpenID Federation entity-statement registry
 │       ├── vc-recognition-handler.ts Recognition VC registry (recursively verified via the parent Verifier)
 │       └── cache-ttl.ts             TTL helpers (Cache-Control, validUntil)
-├── suites/                          Verification suite implementations
+├── suites/                          Verification suite implementations (default suites only)
 │   ├── core/                        Structure checks (context, VC context, credential id, proof exists)
 │   ├── proof/                       Cryptographic signature verification (dispatches to CryptoService)
 │   ├── status/                      BitstringStatusList revocation/suspension
 │   ├── registry/                    Issuer DID lookup via context.lookupIssuers
-│   └── schema/obv3/                 OBv3 JSON Schema and result-ref validation (sibling problem-types.ts holds OBv3-specific ProblemDetail URIs, re-exported into the top-level catalog)
+│   └── schema/obv3/                 AJV-backed OBv3 JSON Schema check; consumed by the openBadgesSchemaSuite bundle in the /openbadges submodule
+├── openbadges/                      Opt-in submodule (published as `@digitalcredentials/verifier-core/openbadges`)
+│   ├── index.ts                     Curated barrel — suites, individual checks, factory, recognition helpers, problem-type catalog, vocabulary
+│   ├── openbadges-suite.ts          Three suite bundles: openBadgesSuite, openBadgesSemanticSuite, openBadgesSchemaSuite
+│   ├── openbadges-zod.ts            Internal tolerant Zod shapes (CredentialSubject / Achievement / Result / ResultDescription)
+│   ├── recognize.ts                 isOpenBadgeCredential / isEndorsementCredential predicates (also consumed by suites/schema/obv3/)
+│   ├── problem-types.ts             Obv3ProblemTypes catalog (also exported as OpenBadgesProblemTypes)
+│   ├── known-achievement-types.ts   OB_3_0_ACHIEVEMENT_TYPES set + KNOWN_ACHIEVEMENT_TYPES default alias + ACHIEVEMENT_TYPE_EXT_PREFIX
+│   ├── result-ref-check.ts          Result.resultDescription → declared ResultDescription.id reference check
+│   ├── achieved-level-check.ts      Result.achievedLevel → RubricCriterionLevel.id reference check
+│   ├── missing-result-status-check.ts  Result.status presence check when ResultDescription.resultType is 'Status'
+│   └── unknown-achievement-type-check.ts  AchievementType vocabulary check (+ createObv3UnknownAchievementTypeCheck factory)
 ├── types/                           TypeScript type definitions
 │   ├── verifier.ts                  Verifier, VerifierConfig, VerifyCredentialCall, VerifyPresentationCall
 │   ├── options.ts                   VerifyCredentialOptions / VerifyPresentationOptions = VerifierConfig & VerifyXCall (compat aliases)
@@ -95,7 +106,14 @@ test/
 │       ├── fake-http-get-service.ts     HttpGetService test double; also counts fetches per URL
 │       └── …                            other Fake* factories
 ├── services/registry-handlers/          Handler unit tests + registry-lookup spec
-├── suites/                              Suite-by-suite unit tests
+├── suites/                              Suite-by-suite unit tests (default suites only)
+├── openbadges/                          OpenBadges submodule unit + integration specs
+│   ├── result-ref-check.spec.ts
+│   ├── achieved-level-check.spec.ts
+│   ├── missing-result-status-check.spec.ts
+│   ├── unknown-achievement-type-check.spec.ts
+│   ├── openbadges-submodule.spec.ts     Integration spec: package.json#exports resolution, default-path invariant, opt-in path, factory composition
+│   └── fixtures/                        TS-module fixtures for the OB integration spec
 └── util/                                Util unit tests
 ```
 
@@ -121,7 +139,7 @@ test/
                  ▼
             ┌──────────┐
             │  Suites  │  runSuites() → CheckResult[]
-            └────┬─────┘  core → proof → status → registry → schema.obv3 (+ additionalSuites)
+            └────┬─────┘  core → proof → status → registry (+ additionalSuites)
                  │
                  ▼
             ┌──────────┐
@@ -148,8 +166,9 @@ they're shared across every call on the same instance — this is what makes bat
 reuse fetches.
 
 **Suites.** `runSuites()` in `run-suites.ts` iterates suites in order, running each check
-sequentially. The default suite order is: **core → proof → status → registry → schema.obv3**.
-Callers can append custom suites via `additionalSuites`.
+sequentially. The default suite order is: **core → proof → status → registry**. Callers can
+append custom suites via `additionalSuites`. Open Badges 3.0 verification ships in the opt-in
+`/openbadges` submodule (see [Vertical submodules](#vertical-submodules-openbadges-and-beyond)).
 
 **Report.** The result is a `CredentialVerificationResult`: a `verified` boolean (true if no
 fatal failures) plus a flat `CheckResult[]` array. Every check that ran (or was skipped) appears
@@ -248,7 +267,10 @@ CheckResult: { suite, check, outcome, timestamp }
 | Proof Verification | `proof`       | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService` |
 | Credential Status  | `status`      | `status.bitstring`                                                             | No    | Revocation/suspension via BitstringStatusList                     |
 | Issuer Registry    | `registry`    | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
-| OBv3 Schema        | `schema.obv3` | `schema.obv3-schema`, `schema.obv3-result-ref`                                 | No    | JSON Schema conformance for OpenBadgeCredential                  |
+
+Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
+longer in the default list; it ships as an opt-in submodule
+(see [Vertical submodules](#vertical-submodules-openbadges-and-beyond)).
 
 ### Adding a custom suite
 
@@ -275,6 +297,49 @@ const result = await verifier.verifyCredential({
   additionalSuites: [myCustomSuite],
 });
 ```
+
+## Vertical submodules (OpenBadges, and beyond)
+
+Some verification logic only matters to a subset of credential consumers. Rather
+than ship that logic in the default suite list — and pay its cost on every
+verification — the library exposes it as an **opt-in submodule** under a
+dedicated `package.json#exports` subpath. The first such submodule is
+`@digitalcredentials/verifier-core/openbadges`.
+
+A vertical submodule has three properties:
+
+1. **It is not part of `defaultSuites`.** Consumers wire it in explicitly via
+   `additionalSuites` on a verify call. Verifiers that don't import the submodule
+   pay zero cost for its checks.
+2. **It owns its own problem-type catalog.** OB-specific URIs live in
+   `src/openbadges/problem-types.ts` (re-exported from the submodule barrel as
+   both `OpenBadgesProblemTypes` and `Obv3ProblemTypes`). The core
+   `src/problem-types.ts` no longer mirrors these entries; consumers branching
+   on OB problems import the submodule's catalog directly.
+3. **It may share recognition helpers with the core suites.** The AJV-backed
+   `obv3SchemaCheck` in `src/suites/schema/obv3/` consumes
+   `isOpenBadgeCredential` / `isEndorsementCredential` from
+   `src/openbadges/recognize.ts`. The directional dependency is
+   `suites/schema/obv3/` → `openbadges/`, never the reverse — the submodule
+   stays free to depend on whatever it needs from the rest of `src/` without
+   creating a cycle.
+
+The `/openbadges` submodule exports three suite bundles
+(`openBadgesSuite`, `openBadgesSemanticSuite`, `openBadgesSchemaSuite`),
+individual checks, a factory for caller-augmented vocabulary
+(`createObv3UnknownAchievementTypeCheck`), recognition helpers, the OB-specific
+problem-type catalog, and version-scoped `AchievementType` vocabulary
+(`OB_3_0_ACHIEVEMENT_TYPES`, the moving `KNOWN_ACHIEVEMENT_TYPES` alias, and the
+spec-sanctioned `ACHIEVEMENT_TYPE_EXT_PREFIX = 'ext:'`). See the README's
+[Open Badges 3.0 verification](../README.md#open-badges-30-verification-opt-in-submodule)
+section for the consumer-facing API.
+
+Future verticals (e.g. EU DCC, jurisdiction-specific trust frameworks, or
+issuer-specific extensions) follow the same pattern: a directory under
+`src/<vertical>/`, a `package.json#exports` entry (`./<vertical>`), one or more
+suite bundles in the curated barrel, and an opt-in admission via
+`additionalSuites`. The default verifier surface stays small; consumers compose
+the verticals they actually need.
 
 ## Type system
 
@@ -346,13 +411,20 @@ derived `ProblemType` union. The map deliberately mixes two provenance categorie
 of W3C VC Data Model 2.0 §7.1 Verification error identifiers (currently only `PARSING_ERROR`) and
 a larger number of synthesized placeholders that share the same
 `https://www.w3.org/TR/vc-data-model#…` prefix as a stable opaque key but are not defined by the
-spec. Each entry has per-token JSDoc calling out its provenance. OBv3-specific entries live in
-`src/suites/schema/obv3/problem-types.ts` and are re-exported into the top-level catalog inline
-so callers see one flat surface; when the OBv3 suite extracts to its own package, the re-export
-line drops out and the OB-specific catalog moves with the suite.
+spec. Each entry has per-token JSDoc calling out its provenance.
+
+Vertical / opt-in problem catalogs live next to their owning vertical and are
+re-exported from that vertical's submodule barrel — they are **not** mirrored
+into the core `ProblemTypes` map. The first such catalog is
+`OpenBadgesProblemTypes` (also exported as `Obv3ProblemTypes`) in
+`src/openbadges/problem-types.ts`, surfaced via
+`@digitalcredentials/verifier-core/openbadges`. Current OB entries:
+`OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,
+`OB_MISSING_RESULT_STATUS`, `OB_UNKNOWN_ACHIEVEMENT_TYPE`. The wire URIs use the
+`…#OB_*` shape so they remain stable across OB version updates.
 
 `ProblemDetail.type` itself stays typed as `string` so callers writing custom suites can emit
-their own URIs without requiring an entry in the catalog.
+their own URIs without requiring an entry in any catalog.
 
 ## Dependencies
 
@@ -431,7 +503,9 @@ without network dependencies, and composable — consumers wire in exactly the b
   parsing libraries inline rather than through narrower ports — though they do share the verifier's
   `httpGetService` and `cacheService`, so caching and HTTP behavior are uniform.
 - **OBv3 schema check** uses AJV directly. A `JsonSchemaValidator` port would let consumers swap
-  in a different validator or share a single validator across calls.
+  in a different validator or share a single validator across calls. (The check itself was
+  already lifted into the opt-in `/openbadges` submodule's `openBadgesSchemaSuite` bundle, so
+  consumers who don't care about Open Badges already pay zero cost for it.)
 - **No `Clock` port.** TTL math reads from `new Date()` / `Date.now()` directly, which makes
   time-dependent behavior awkward to test.
 
@@ -442,8 +516,8 @@ the remaining hexagonal work is:
 
 1. Route the bitstring-status check through `Verifier.verifyCredential` (drop the direct
    `cryptoSuites` dependency on `VerificationContext`).
-2. Wrap AJV behind a `JsonSchemaValidator` port (and lift the OBv3 schema check into a separate
-   vertical so callers who don't care about Open Badges can drop it).
+2. Wrap AJV behind a `JsonSchemaValidator` port. (The "lift the OBv3 schema check into a
+   separate vertical" half of this item is done — see the `/openbadges` submodule.)
 3. Introduce a `Clock` port for testable TTL behavior.
 
 This is a direction, not a mandate. Progress is incremental — each change that moves a concrete

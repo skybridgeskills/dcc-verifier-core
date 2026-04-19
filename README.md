@@ -13,6 +13,7 @@
   - [verifyPresentation](#verifypresentation)
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
 - [Custom Suites](#custom-suites)
+- [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
 - [Architecture](#architecture)
 - [Migration from earlier 1.0.0-beta.x](#migration-from-earlier-100-betax)
 - [Install](#install)
@@ -37,7 +38,10 @@ Verification runs an ordered pipeline of **suites**, each containing one or more
 | **Proof** | Cryptographic signature verification | Yes |
 | **Status** | Revocation/suspension via BitstringStatusList | No |
 | **Registry** | Issuer DID lookup in known trust registries | No |
-| **Schema** | OBv3 JSON Schema conformance | No |
+
+Open Badges 3.0 verification lives in the opt-in submodule
+[`@digitalcredentials/verifier-core/openbadges`](#open-badges-30-verification-opt-in-submodule)
+and is not part of the default suite list.
 
 The result doesn't make a single "valid/invalid" judgment. It returns the outcome of every check, letting consumers decide what matters for their use case. A credential with an expired status might still be useful as a historical record; an unregistered issuer might simply mean the registry hasn't been updated yet.
 
@@ -139,8 +143,7 @@ interface ProblemDetail {
     { "suite": "core",   "check": "core.proof-exists",   "outcome": { "status": "success", "message": "..." } },
     { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
     { "suite": "status", "check": "status.bitstring",    "outcome": { "status": "success", "message": "Credential status is valid (not revoked or suspended)." } },
-    { "suite": "registry", "check": "registry.issuer",   "outcome": { "status": "success", "message": "Issuer found in registry: DCC Sandbox Registry" } },
-    { "suite": "schema.obv3", "check": "...",            "outcome": { "status": "success", "message": "..." } }
+    { "suite": "registry", "check": "registry.issuer",   "outcome": { "status": "success", "message": "Issuer found in registry: DCC Sandbox Registry" } }
   ]
 }
 ```
@@ -361,6 +364,113 @@ const result = await verifyCredential({
 
 Custom suites run after the default suites. Each check receives the same `VerificationSubject` and `VerificationContext` as built-in checks.
 
+## Open Badges 3.0 verification (opt-in submodule)
+
+Open Badges 3.0 verification ships in `@digitalcredentials/verifier-core/openbadges`
+as an opt-in submodule. It is not part of the default suite list; consumers that
+want OB checks pass `openBadgesSuite` (or one of the bundled variants) via
+`additionalSuites` on a verify call.
+
+> [!IMPORTANT]
+> If you were on `1.0.0-beta.x` and relied on `obv3SchemaSuite` running by default,
+> you now need to opt in explicitly. The simplest migration is to add
+> `openBadgesSuite` to your verify call.
+
+### Enabling OB verification
+
+```ts
+import { createVerifier } from '@digitalcredentials/verifier-core';
+import { openBadgesSuite } from '@digitalcredentials/verifier-core/openbadges';
+
+const verifier = createVerifier();
+const result = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [openBadgesSuite],
+});
+```
+
+### Bundle variants
+
+| Bundle                     | Contents                                                          | Network? |
+|----------------------------|-------------------------------------------------------------------|----------|
+| `openBadgesSuite`          | Semantic checks **and** AJV JSON Schema check (the default bundle)| Yes (schema fetch on first use; cached after) |
+| `openBadgesSemanticSuite`  | Cross-field semantic checks only                                   | No       |
+| `openBadgesSchemaSuite`    | AJV JSON Schema check only                                         | Yes      |
+
+Pick `openBadgesSemanticSuite` when you want the OB-specific semantic checks
+(`OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,
+`OB_MISSING_RESULT_STATUS`, `OB_UNKNOWN_ACHIEVEMENT_TYPE`) but cannot afford a
+network fetch on the first OB credential of a process.
+
+### Problem types
+
+OB-specific problem URIs live on `OpenBadgesProblemTypes` (also exported as
+`Obv3ProblemTypes` for symmetry with internal naming):
+
+```ts
+import {
+  openBadgesSuite,
+  OpenBadgesProblemTypes,
+  type OpenBadgesProblemType,
+} from '@digitalcredentials/verifier-core/openbadges';
+
+// In a result-handling callback...
+switch (problem.type as OpenBadgesProblemType) {
+  case OpenBadgesProblemTypes.OB_INVALID_RESULT_REFERENCE:
+    // ...
+    break;
+  case OpenBadgesProblemTypes.OB_INVALID_ACHIEVED_LEVEL:
+    // ...
+    break;
+  case OpenBadgesProblemTypes.OB_MISSING_RESULT_STATUS:
+    // ...
+    break;
+  case OpenBadgesProblemTypes.OB_UNKNOWN_ACHIEVEMENT_TYPE:
+    // ...
+    break;
+}
+```
+
+The wire URIs follow the `…#OB_*` shape (e.g.
+`https://www.w3.org/TR/vc-data-model#OB_INVALID_ACHIEVED_LEVEL`). Callers
+upgrading from `1.0.0-beta.x` who literal-matched `OBV3_INVALID_RESULT_REFERENCE`
+need to update those literals to `OB_INVALID_RESULT_REFERENCE` (or — preferred
+— switch to the `OpenBadgesProblemTypes` constants).
+
+### Caller-augmented `AchievementType` vocabulary
+
+The default `obv3UnknownAchievementTypeCheck` validates against the
+OB 3.0 §B.1.1 enumeration plus the spec-sanctioned `ext:` prefix. Issuers that
+mint additional vocabulary tokens (without an `ext:` prefix) can compose a
+custom check that adds those tokens to the accepted set:
+
+```ts
+import {
+  openBadgesSemanticSuite,
+  createObv3UnknownAchievementTypeCheck,
+} from '@digitalcredentials/verifier-core/openbadges';
+
+const customCheck = createObv3UnknownAchievementTypeCheck({
+  additionalKnownTypes: ['MyOrgInternalAchievementType'],
+});
+
+const customSuite = {
+  ...openBadgesSemanticSuite,
+  checks: openBadgesSemanticSuite.checks.map(c =>
+    c.id === 'schema.obv3.unknown-achievement-type' ? customCheck : c,
+  ),
+};
+
+const result = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [customSuite],
+});
+```
+
+For version-pinned behavior, the `OB_3_0_ACHIEVEMENT_TYPES` set is exported
+directly so callers can build their own check against an explicit OB version
+rather than tracking the moving `KNOWN_ACHIEVEMENT_TYPES` alias.
+
 ## Architecture
 
 For internal architecture details — verification pipeline, suite model, type system, dependencies, and architectural direction — see [`docs/architecture.md`](docs/architecture.md).
@@ -381,6 +491,10 @@ This release tightens the public API surface. The following changes may require 
 - **Legacy result types removed:** `VerificationResponse`, `PresentationVerificationResponse`, and friends were already removed from `index.ts` in `1.0.0-beta.11`; the type definitions are now gone too. Anyone who needed the old shape can pin `1.0.0-beta.11` or earlier.
 
 - **`ProblemTypes` const map added:** built-in problem URIs are now importable as `ProblemTypes.INVALID_SIGNATURE` etc. Existing literal-string comparisons against `ProblemDetail.type` continue to work unchanged.
+
+- **OBv3 verification is opt-in** — the OBv3 schema suite no longer runs by default. Add `openBadgesSuite` (or one of its variants) via `additionalSuites` on the verify call to restore previous behavior. See the [Open Badges 3.0 verification](#open-badges-30-verification-opt-in-submodule) section for details.
+
+- **OBv3 problem-type rename** — `OBV3_INVALID_RESULT_REFERENCE` (and other OB problems mirrored on `ProblemTypes`) moved out of the core catalog into `OpenBadgesProblemTypes` in the `/openbadges` submodule, and the wire URIs shifted from `…#OBV3_*` to `…#OB_*`. Callers comparing literal strings against `ProblemDetail.type` need to update the affected literals; callers using the constants should switch to the new module.
 
 ## Install
 
