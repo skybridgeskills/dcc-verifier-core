@@ -1,12 +1,18 @@
 import { expect } from 'chai';
 import { verifyCredential } from '../src/index.js';
 import { openBadgesSchemaSuite } from '../src/openbadges/index.js';
+import { runSuites } from '../src/run-suites.js';
+import { defaultSuites } from '../src/default-suites.js';
 import { VerificationCheck, CheckOutcome } from '../src/types/check.js';
 import {
+  BitstringStatusEntry,
   CredentialFactory,
   DEFAULT_TEST_ISSUER_DID,
-} from './factories/data/credential-factory.js';
+  StatusListCredentialFactory,
+} from './factories/data/index.js';
+import { buildTestContext } from './factories/services/build-test-context.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
+import { FakeDocumentLoader } from './factories/services/fake-document-loader.js';
 import { v1Expired } from './fixtures/v1-expired.js';
 import { v2Expired } from './fixtures/v2-expired.js';
 
@@ -272,6 +278,60 @@ describe('verifyCredential', () => {
 
       const obSchemaResults = result.results.filter(r => r.suite === 'openbadges.schema');
       expect(obSchemaResults.length).to.be.greaterThan(0);
+    });
+  });
+
+  // P-E regression: revoked credentials must fail with the failure
+  // sourced from the status suite, not the proof suite. We exercise this
+  // through the same code path createVerifier uses (defaultSuites +
+  // runSuites + hasFatalFailures), but skip status-list signature
+  // verification because that internal flag is not exposed via
+  // VerifierConfig (slated for removal in P-H). The contract being
+  // pinned is the aggregation, not the wiring.
+  describe('revoked credential sourcing (P-E)', () => {
+    it('flips verified to false via status.bitstring (not proof.signature) when status list marks the index revoked', async () => {
+      const listUrl = 'https://factory.test/status/list-revoked-pe';
+      const slCred = await StatusListCredentialFactory({
+        id: listUrl,
+        issuer: DEFAULT_TEST_ISSUER_DID,
+        revokedIndexes: [3],
+        listLength: 32,
+      });
+      const documentLoader = FakeDocumentLoader({ [listUrl]: slCred });
+      const ctx = buildTestContext({
+        documentLoader,
+        cryptoServices: [FakeCryptoService({ verified: true })],
+        verifyBitstringStatusListCredential: false,
+      });
+
+      const credential = CredentialFactory({
+        version: 'v2',
+        credential: {
+          credentialStatus: BitstringStatusEntry({
+            statusListCredential: listUrl,
+            statusListIndex: '3',
+          }),
+        },
+      });
+
+      const results = await runSuites(
+        defaultSuites,
+        { verifiableCredential: credential },
+        ctx,
+      );
+
+      const verified = !results.some(
+        r => r.fatal && r.outcome.status === 'failure',
+      );
+      expect(verified).to.equal(false);
+
+      const statusResult = results.find(r => r.check === 'status.bitstring');
+      expect(statusResult, 'status.bitstring result present').to.exist;
+      expect(statusResult?.outcome.status).to.equal('failure');
+      expect(statusResult?.fatal).to.equal(true);
+
+      const proofResult = results.find(r => r.check === 'proof.signature');
+      expect(proofResult?.outcome.status).to.equal('success');
     });
   });
 

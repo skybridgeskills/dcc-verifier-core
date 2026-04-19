@@ -222,7 +222,26 @@ issuer DID documents (via the `CachedResolver` baked into the document loader), 
 registry payloads, OIDF entity statements, and any data the registry handlers store under
 `cacheService`.
 
-Each `createVerifier()` without an explicit `cacheService` gets a fresh `InMemoryCacheService`. The default cache is no longer process-wide; two verifiers built from defaults isolate their cache contents. The default `BuiltinHttpGetService` is still memoized because the adapter itself is stateless, and the default crypto stack and bundled `securityLoader`-based document loader are also memoized for the same reason — only the cache, which holds caller-visible mutable state, is per-instance by default. To deliberately share cache state across verifiers, construct one `InMemoryCacheService` (or any `CacheService` adapter) and pass it as `createVerifier({ cacheService })` to each.
+Each `createVerifier()` without an explicit `cacheService` gets a fresh `InMemoryCacheService`. The default cache is no longer process-wide; two verifiers built from defaults isolate their cache contents. The default `BuiltinHttpGetService` is still memoized because the adapter itself is stateless, and the default crypto stack and document loader are also memoized for the same reason — only the cache, which holds caller-visible mutable state, is per-instance by default. To deliberately share cache state across verifiers, construct one `InMemoryCacheService` (or any `CacheService` adapter) and pass it as `createVerifier({ cacheService })` to each.
+
+#### Default document loader routing
+
+`defaultDocumentLoaderFor(httpGetService)` always builds the JSON-LD
+document loader via `documentLoaderFromHttpGet(httpGetService)` — the
+same path used when callers pass their own `httpGetService`. Every
+remote fetch (JSON-LD contexts, `did:web` documents, status list
+credentials) therefore flows through the verifier's HTTP service,
+giving caller-installed mocks, retries, and (future) caches a single
+chokepoint to observe.
+
+To avoid re-allocating the loader's `CachedResolver` and DID drivers
+on every call, the per-service loader is memoized via a module-local
+`WeakMap<HttpGetService, DocumentLoader>`. The default service is
+itself memoized, so its loader persists for the process; caller
+services map to one loader each, GC'd when the caller drops the
+service. The standalone `verifyCredential` / `verifyPresentation`
+wrappers (which build a fresh verifier per call) reuse the same
+loader for the default service via this map.
 
 ```ts
 import { createVerifier } from '@digitalcredentials/verifier-core';
@@ -281,8 +300,8 @@ CheckResult: { suite, check, outcome, timestamp }
 |--------------------|---------------|-----------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
 | Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.credential-id`, `core.proof-exists` | Yes  | Validates basic VC structure before crypto                       |
 | Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
-| Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService` |
-| Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | No    | Revocation/suspension via BitstringStatusList                     |
+| Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService`. Does **not** check credential status — see the status suite. |
+| Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | Yes   | Revocation/suspension via BitstringStatusList. **Sole owner** of status verification: a missing/invalid/expired status list, a wrong-typed list, or a flipped revocation/suspension bit all fail the credential. |
 | Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
 Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
@@ -638,7 +657,8 @@ without network dependencies, and composable — consumers wire in exactly the b
 - **Proof suite** dispatches via `CryptoService.canVerify(...)` (a port), but the default
   implementation embeds `@digitalcredentials/vc` directly inside `DataIntegrityCryptoService`.
   Replacing the default crypto service requires understanding the LD-Proofs / Data Integrity
-  internals.
+  internals. The default crypto service verifies signatures only — credential status checking
+  is the sole responsibility of the status suite (P-E, 2026-04-19).
 - **Status suite** consumes `@digitalcredentials/vc-bitstring-status-list` directly and reads
   the legacy `cryptoSuites` and `verifyBitstringStatusListCredential` fields off
   `VerificationContext`. Both context fields are marked `@internal` and slated for removal once

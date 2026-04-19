@@ -130,19 +130,25 @@ function classifyStatusError(error: unknown): ProblemDetail[] {
 /**
  * Bitstring status list check for revocation/suspension status.
  *
- * This check verifies the credential's status using the BitstringStatusList
- * specification. It is non-fatal because status check failures don't invalidate
- * the credential itself, only provide additional information.
+ * This is a **fatal** check: if the verifier cannot conclude that the
+ * credential is currently un-revoked and un-suspended (because the
+ * status list is missing, has an invalid signature, is expired, has a
+ * wrong type, or actually marks the credential as revoked or
+ * suspended), the overall verification result is `verified: false`.
  *
- * Skipped when:
- * - Credential has no credentialStatus
- * - Status type is a legacy type (StatusList2021Entry, 1EdTechRevocationList)
+ * `statusSuite` is the sole owner of status verification; the proof
+ * suite no longer performs an embedded status check (P-E, 2026-04-19).
+ *
+ * Skipped (and therefore non-failing) when:
+ * - Credential has no `credentialStatus`.
+ * - Status type is a legacy type (`StatusList2021Entry`,
+ *   `1EdTechRevocationList`).
  */
 export const bitstringStatusCheck: VerificationCheck = {
   id: 'status.bitstring',
   name: 'Bitstring Status Check',
   description: 'Checks revocation and suspension status via BitstringStatusList.',
-  fatal: false,
+  fatal: true,
   appliesTo: ['verifiableCredential'],
   execute: async (
     subject: VerificationSubject,

@@ -4,13 +4,15 @@ import { bitstringStatusCheck } from './bitstring-status-check.js';
 /**
  * Credential status verification suite.
  *
- * Checks revocation and suspension status via BitstringStatusList.
- * This suite is non-fatal - status check failures don't invalidate the credential,
- * they only provide additional information about the credential's current state.
+ * Sole owner of status verification (post-P-E, 2026-04-19). Checks
+ * revocation and suspension status via BitstringStatusList. The
+ * underlying check is **fatal** — see {@link bitstringStatusCheck}
+ * for the contract.
  *
  * Skipped when:
- * - Credential has no credentialStatus
- * - Status type is a legacy type (StatusList2021Entry, 1EdTechRevocationList)
+ * - Credential has no `credentialStatus`.
+ * - Status type is a legacy type (`StatusList2021Entry`,
+ *   `1EdTechRevocationList`).
  */
 export const statusSuite: VerificationSuite = {
   id: 'status',

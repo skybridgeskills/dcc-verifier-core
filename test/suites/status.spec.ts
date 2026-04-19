@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { runSuites } from '../../src/run-suites.js';
 import { statusSuite } from '../../src/suites/status/index.js';
+import { bitstringStatusCheck } from '../../src/suites/status/bitstring-status-check.js';
 import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import {
@@ -10,6 +11,12 @@ import {
   StatusListCredentialFactory,
 } from '../factories/data/index.js';
 import { FakeDocumentLoader } from '../factories/services/fake-document-loader.js';
+
+describe('bitstringStatusCheck contract', () => {
+  it('is fatal — a status failure flips overall verified to false', () => {
+    expect(bitstringStatusCheck.fatal).to.equal(true);
+  });
+});
 
 describe('Status Suite', () => {
   const createSubject = (credential: unknown): VerificationSubject => ({

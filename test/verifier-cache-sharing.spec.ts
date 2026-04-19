@@ -17,13 +17,22 @@
 
 import { expect } from 'chai';
 import { createVerifier } from '../src/verifier.js';
+import {
+  defaultDocumentLoaderFor,
+  defaultHttpGetService,
+} from '../src/default-services.js';
 import { InMemoryCacheService } from '../src/services/cache-service/in-memory-cache-service.js';
+import {
+  BitstringStatusEntry,
+  StatusListCredentialFactory,
+} from './factories/data/index.js';
 import {
   FakeCryptoService,
   FakeHttpGetService,
   okJsonBody,
 } from './factories/services/index.js';
 import type { EntityIdentityRegistry } from '../src/types/registry.js';
+import type { HttpGetService } from '../src/services/http-get-service/http-get-service.js';
 
 const ISSUER_DID = 'did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q';
 const REGISTRY_URL = 'https://example.test/registry.json';
@@ -125,6 +134,69 @@ describe('Verifier cache sharing', () => {
     // Confirms the previous test's "==1" is meaningful: without a shared
     // cache, the registry URL is hit per call.
     expect(http.callsTo(REGISTRY_URL)).to.equal(2);
+  });
+
+  describe('status list URL routing through httpGetService (P-E)', () => {
+    const STATUS_LIST_URL = 'https://example.test/status/list-pe';
+
+    /** Same-shape VC as `makeCredential`, but adds a BitstringStatusListEntry. */
+    function makeRevocableCredential(id: string): Record<string, unknown> {
+      return {
+        ...makeCredential(id),
+        credentialStatus: BitstringStatusEntry({
+          statusListCredential: STATUS_LIST_URL,
+          statusListIndex: '0',
+        }),
+      };
+    }
+
+    it('fetches the status list URL exactly once per verifyCredential call (no double-check from the proof suite)', async () => {
+      const slCred = await StatusListCredentialFactory({
+        id: STATUS_LIST_URL,
+        revokedIndexes: [],
+        listLength: 32,
+      });
+      const http = FakeHttpGetService({
+        [REGISTRY_URL]: okJsonBody(REGISTRY_BODY),
+        [STATUS_LIST_URL]: okJsonBody(slCred),
+      });
+
+      const verifier = createVerifier({
+        httpGetService: http,
+        cacheService: InMemoryCacheService(),
+        cryptoServices: [FakeCryptoService({ verified: true })],
+        registries: [dccLegacyRegistry],
+      });
+
+      await verifier.verifyCredential({
+        credential: makeRevocableCredential('urn:uuid:status-once-1'),
+      });
+
+      // Pre-P-E this was 2 (DataIntegrityCryptoService.checkStatus + statusSuite).
+      // Post-P-E only statusSuite fetches the list.
+      expect(http.callsTo(STATUS_LIST_URL)).to.equal(1);
+    });
+  });
+
+  describe('document loader memoization per HttpGetService (P-E)', () => {
+    it('returns the same DocumentLoader for the same HttpGetService instance', () => {
+      const fake: HttpGetService = FakeHttpGetService({});
+      const a = defaultDocumentLoaderFor(fake);
+      const b = defaultDocumentLoaderFor(fake);
+      expect(a).to.equal(b);
+    });
+
+    it('returns the same DocumentLoader for the memoized default HttpGetService across calls', () => {
+      const a = defaultDocumentLoaderFor(defaultHttpGetService());
+      const b = defaultDocumentLoaderFor(defaultHttpGetService());
+      expect(a).to.equal(b);
+    });
+
+    it('returns a different DocumentLoader for a different HttpGetService instance', () => {
+      const a = defaultDocumentLoaderFor(FakeHttpGetService({}));
+      const b = defaultDocumentLoaderFor(FakeHttpGetService({}));
+      expect(a).to.not.equal(b);
+    });
   });
 
   it('shares the cache across the credentials embedded in a presentation', async () => {

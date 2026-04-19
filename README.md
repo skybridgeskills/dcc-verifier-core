@@ -38,7 +38,7 @@ Verification runs an ordered pipeline of **suites**, each containing one or more
 | **Core** | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists | Yes |
 | **Recognition** | `recognition` | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured) | No |
 | **Proof** | `cryptographic` | Cryptographic signature verification | Yes |
-| **Status** | `cryptographic` | Revocation/suspension via BitstringStatusList | No |
+| **Status** | `cryptographic` | Revocation/suspension via BitstringStatusList — sole owner of status verification | Yes |
 | **Registry** | `trust` | Issuer DID lookup in known trust registries | No |
 
 The **Phase** column drives the optional `phases:` filter on
@@ -49,7 +49,7 @@ Open Badges 3.0 verification lives in the opt-in submodule
 [`@digitalcredentials/verifier-core/openbadges`](#open-badges-30-verification-opt-in-submodule)
 and is not part of the default suite list.
 
-The result doesn't make a single "valid/invalid" judgment. It returns the outcome of every check, letting consumers decide what matters for their use case. A credential with an expired status might still be useful as a historical record; an unregistered issuer might simply mean the registry hasn't been updated yet.
+The result doesn't make a single "valid/invalid" judgment. It returns the outcome of every check, letting consumers decide what matters for their use case. A credential with a revoked status will fail (`verified: false`) — that's an issuer-asserted state we can't ignore — but other distinctions, like an unregistered issuer (the registry might just not be up to date), are surfaced as non-fatal results for the consumer to weigh.
 
 ### Trust Registries
 
@@ -173,6 +173,28 @@ An invalid signature is fatal — it means any part of the credential could have
       }]
     }},
     { "suite": "status", "check": "status.bitstring", "outcome": { "status": "skipped", "reason": "..." } }
+  ]
+}
+```
+
+#### Example: Revoked credential (fatal, sourced from status)
+
+When a credential's status list marks it revoked or suspended — or the verifier can't confidently evaluate the list (missing, expired, wrong type, signature invalid) — the status suite fails the credential. The proof check still passes on its own merits.
+
+```json
+{
+  "verified": false,
+  "results": [
+    { "suite": "core",   "check": "core.context-exists", "outcome": { "status": "success", "message": "..." } },
+    { "suite": "proof",  "check": "proof.signature",     "outcome": { "status": "success", "message": "Signature verified successfully." } },
+    { "suite": "status", "check": "status.bitstring", "outcome": {
+      "status": "failure",
+      "problems": [{
+        "type": "https://www.w3.org/TR/vc-data-model#CREDENTIAL_REVOKED_OR_SUSPENDED",
+        "title": "Credential Revoked or Suspended",
+        "detail": "The credential has been revoked or suspended according to the status list."
+      }]
+    }}
   ]
 }
 ```
