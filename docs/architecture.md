@@ -26,7 +26,7 @@ src/
 ├── index.ts                         Public API barrel (all exports)
 ├── verifier.ts                      createVerifier(config) factory + internal context builder (composition root)
 ├── verify-suite.ts                  Standalone verifyCredential / verifyPresentation wrappers over createVerifier
-├── default-suites.ts                Internal: defaultSuites array (core → proof → status → registry); Open Badges suites are opt-in via the `/openbadges` submodule
+├── default-suites.ts                Internal: defaultSuites array (core → recognition → proof → status → registry); Open Badges suites are opt-in via the `/openbadges` submodule
 ├── default-services.ts              Internal: lazy factories for default httpGetService, cryptoServices, documentLoader (memoized) + per-call createDefaultCacheService
 ├── run-suites.ts                    Suite orchestration engine
 ├── extract-credentials-from.ts      Normalize VP's embedded credentials to array
@@ -53,38 +53,47 @@ src/
 │       └── cache-ttl.ts             TTL helpers (Cache-Control, validUntil)
 ├── suites/                          Verification suite implementations (default suites only)
 │   ├── core/                        Structure checks (context, VC context, credential id, proof exists)
+│   ├── recognition/                 Pluggable recognizer dispatch; produces normalized credential form
 │   ├── proof/                       Cryptographic signature verification (dispatches to CryptoService)
 │   ├── status/                      BitstringStatusList revocation/suspension
 │   ├── registry/                    Issuer DID lookup via context.lookupIssuers
 │   └── schema/obv3/                 AJV-backed OBv3 JSON Schema check; consumed by the openBadgesSchemaSuite bundle in the /openbadges submodule
 ├── openbadges/                      Opt-in submodule (published as `@digitalcredentials/verifier-core/openbadges`)
 │   ├── index.ts                     Curated barrel — suites, individual checks, factory, recognition helpers, problem-type catalog, vocabulary
-│   ├── openbadges-suite.ts          Three suite bundles: openBadgesSuite, openBadgesSemanticSuite, openBadgesSchemaSuite
+│   ├── openbadges-suite.ts          Three suite bundles: openBadgesSuite, openBadgesSemanticSuite, openBadgesSchemaSuite (all phase: 'semantic')
 │   ├── openbadges-zod.ts            Internal tolerant Zod shapes (CredentialSubject / Achievement / Result / ResultDescription)
 │   ├── recognize.ts                 isOpenBadgeCredential / isEndorsementCredential predicates (also consumed by suites/schema/obv3/)
+│   ├── recognizers.ts               obv3p0Recognizer + obv3p0EndorsementRecognizer (RecognizerSpec implementations)
 │   ├── problem-types.ts             Obv3ProblemTypes catalog (also exported as OpenBadgesProblemTypes)
 │   ├── known-achievement-types.ts   OB_3_0_ACHIEVEMENT_TYPES set + KNOWN_ACHIEVEMENT_TYPES default alias + ACHIEVEMENT_TYPE_EXT_PREFIX
 │   ├── result-ref-check.ts          Result.resultDescription → declared ResultDescription.id reference check
 │   ├── achieved-level-check.ts      Result.achievedLevel → RubricCriterionLevel.id reference check
 │   ├── missing-result-status-check.ts  Result.status presence check when ResultDescription.resultType is 'Status'
-│   └── unknown-achievement-type-check.ts  AchievementType vocabulary check (+ createObv3UnknownAchievementTypeCheck factory)
+│   ├── unknown-achievement-type-check.ts  AchievementType vocabulary check (+ createObv3UnknownAchievementTypeCheck factory)
+│   └── schemas/                     Strict OB 3.0 envelope Zod schemas (recognition pipeline)
+│       ├── fields-v3p0.ts           Shared field builders (IriString, JsonLdTypeField, Obv3p0ContextArray, zodErrorToProblems)
+│       ├── classes-v3p0.ts          Inner class schemas (Image, Profile, Achievement, AchievementSubject, Result, ResultDescription, RubricCriterionLevel) + ProfileRefField + ImageField
+│       ├── openbadge-credential-v3p0.ts  Strict envelope + parseObv3p0OpenBadgeCredential
+│       └── endorsement-credential-v3p0.ts  Strict envelope + parseObv3p0EndorsementCredential
 ├── types/                           TypeScript type definitions
-│   ├── verifier.ts                  Verifier, VerifierConfig, VerifyCredentialCall, VerifyPresentationCall
+│   ├── verifier.ts                  Verifier, VerifierConfig (incl. `recognizers`, `phases`), VerifyCredentialCall, VerifyPresentationCall
 │   ├── options.ts                   VerifyCredentialOptions / VerifyPresentationOptions = VerifierConfig & VerifyXCall (compat aliases)
-│   ├── check.ts                     CheckOutcome, CheckResult, VerificationCheck, VerificationSuite
+│   ├── check.ts                     CheckOutcome, CheckResult, VerificationCheck, VerificationSuite (incl. `applies`, `phase`), SuitePhase
 │   ├── context.ts                   VerificationContext, DocumentLoader, FetchJson
 │   ├── crypto-service.ts            CryptoService port
 │   ├── crypto-suite.ts              CryptoSuite types (legacy LDP / Data Integrity)
-│   ├── result.ts                    CredentialVerificationResult / PresentationVerificationResult
+│   ├── recognition.ts               RecognizerSpec, RecognitionResult (recognition plugin contract)
+│   ├── result.ts                    CredentialVerificationResult / PresentationVerificationResult (incl. `normalizedVerifiableCredential`, `recognizedProfile`, `partial`)
 │   ├── http.ts                      HttpGetResult
 │   ├── subject.ts                   VerificationSubject
-│   ├── problem-detail.ts            ProblemDetail (RFC 9457-inspired)
+│   ├── problem-detail.ts            ProblemDetail (RFC 9457-inspired; carries `instance` JSON Pointer)
 │   └── registry.ts                  EntityIdentityRegistry, LookupIssuers, RegistryLookupResult
 └── util/                            Internal helpers
     ├── document-loader-from-http-get.ts  Build a JSON-LD loader backed by an HttpGetService
     ├── did-web-driver-with-http-get.ts   did:web resolution via HttpGetService (cache-sharing)
     ├── fetch-json-from-http-get.ts       Wrap an HttpGetService as a FetchJson
     ├── registry-key-hash.ts              Stable hash of a registry list for cache keys
+    ├── json-pointer.ts                   formatJsonPointer (RFC 6901) for ProblemDetail.instance values
     └── jwt-payload-decode.ts             Minimal JWT payload decoder (OIDF handler)
 ```
 
@@ -139,11 +148,13 @@ test/
                  ▼
             ┌──────────┐
             │  Suites  │  runSuites() → CheckResult[]
-            └────┬─────┘  core → proof → status → registry (+ additionalSuites)
-                 │
+            └────┬─────┘  core → recognition → proof → status → registry (+ additionalSuites)
+                 │        (phase filter applied first; `applies` predicates gate next)
                  ▼
             ┌──────────┐
-            │  Report  │  { verified, verifiableCredential, results: CheckResult[] }
+            │  Report  │  { verified, verifiableCredential,
+            │          │    normalizedVerifiableCredential?, recognizedProfile?,
+            │          │    results: CheckResult[], partial? }
             └──────────┘
 ```
 
@@ -166,9 +177,14 @@ they're shared across every call on the same instance — this is what makes bat
 reuse fetches.
 
 **Suites.** `runSuites()` in `run-suites.ts` iterates suites in order, running each check
-sequentially. The default suite order is: **core → proof → status → registry**. Callers can
-append custom suites via `additionalSuites`. Open Badges 3.0 verification ships in the opt-in
-`/openbadges` submodule (see [Vertical submodules](#vertical-submodules-openbadges-and-beyond)).
+sequentially. The default suite order is: **core → recognition → proof → status → registry**.
+Each suite carries a `phase` tag (`'cryptographic' | 'trust' | 'recognition' | 'semantic'`)
+that drives the optional phase filter (see [Phases and two-pass
+verification](#phases-and-two-pass-verification)) and may declare an `applies` predicate that
+gates execution against the current subject (see [The `applies` predicate](#the-applies-predicate)).
+Callers can append custom suites via `additionalSuites`. Open Badges 3.0 verification ships in
+the opt-in `/openbadges` submodule (see
+[Vertical submodules](#vertical-submodules-openbadges-and-beyond)).
 
 **Report.** The result is a `CredentialVerificationResult`: a `verified` boolean (true if no
 fatal failures) plus a flat `CheckResult[]` array. Every check that ran (or was skipped) appears
@@ -261,16 +277,122 @@ CheckResult: { suite, check, outcome, timestamp }
 
 ### Default suites
 
-| Suite              | ID            | Checks                                                                         | Fatal | Purpose                                                          |
-|--------------------|---------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
-| Core Structure     | `core`        | `core.context-exists`, `core.vc-context`, `core.credential-id`, `core.proof-exists` | Yes  | Validates basic VC structure before crypto                       |
-| Proof Verification | `proof`       | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService` |
-| Credential Status  | `status`      | `status.bitstring`                                                             | No    | Revocation/suspension via BitstringStatusList                     |
-| Issuer Registry    | `registry`    | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
+| Suite              | ID            | Phase           | Checks                                                                         | Fatal | Purpose                                                          |
+|--------------------|---------------|-----------------|--------------------------------------------------------------------------------|-------|------------------------------------------------------------------|
+| Core Structure     | `core`        | `cryptographic` | `core.context-exists`, `core.vc-context`, `core.credential-id`, `core.proof-exists` | Yes  | Validates basic VC structure before crypto                       |
+| Recognition        | `recognition` | `recognition`   | `recognition.profile`                                                          | No    | Pluggable recognizer dispatch; produces normalized credential form. No-op when no recognizers configured. |
+| Proof Verification | `proof`       | `cryptographic` | `proof.signature`                                                              | Yes   | Cryptographic signature verification dispatched via `CryptoService` |
+| Credential Status  | `status`      | `cryptographic` | `status.bitstring`                                                             | No    | Revocation/suspension via BitstringStatusList                     |
+| Issuer Registry    | `registry`    | `trust`         | `registry.issuer`                                                              | No    | Lookup issuer DID in known registries via `context.lookupIssuers` |
 
 Open Badges 3.0 verification (semantic checks and JSON Schema conformance) is no
 longer in the default list; it ships as an opt-in submodule
-(see [Vertical submodules](#vertical-submodules-openbadges-and-beyond)).
+(see [Vertical submodules](#vertical-submodules-openbadges-and-beyond)). The OB
+suite bundles are tagged `phase: 'semantic'`.
+
+### Phases and two-pass verification
+
+Every built-in suite carries a `phase` tag drawn from
+`SuitePhase = 'cryptographic' | 'trust' | 'recognition' | 'semantic'`. The phase
+is consumed by the optional `phases?: SuitePhase[]` filter on `VerifierConfig`
+(or per-call on `VerifyCredentialCall` / `VerifyPresentationCall`):
+
+- **No `phases:`** — every suite runs (default behavior; the phase tag is
+  effectively ignored). `partial` is unset on the result.
+- **`phases:` provided** — only suites whose `phase` is in the list run.
+  Suites without a `phase` tag bypass the filter and always run, so a custom
+  suite that omits `phase` cannot be accidentally skipped by a phase request.
+  All built-in suites are explicitly tagged.
+- **Auto-include rule** — requesting `'semantic'` automatically adds
+  `'recognition'` to the effective phase set so semantic suites can consume the
+  normalized credential form.
+- **`partial: true`** is set on `CredentialVerificationResult` and
+  `PresentationVerificationResult` whenever the consumer passed an explicit
+  `phases:` value. Downstream code can use this flag to recognize that the
+  result intentionally covers only a subset of the pipeline.
+
+The two-pass workflow this enables: run a full pipeline once
+(`verifyPresentation` with no phase filter) to perform cryptographic + trust +
+recognition + semantic checks; then later, when the consumer wants to re-run
+deeper semantic analysis (e.g. re-deriving a UI summary from a normalized
+credential), call `verifyCredential` with `phases: ['semantic']` to skip the
+crypto and trust passes while still receiving a normalized form. The union of a
+crypto-and-trust pass and a semantic pass is equivalent to a single full pass.
+
+Phase filtering happens **before** the `applies` predicate, and a phase-excluded
+suite is invisible — it does not emit a synthetic skipped result even when
+explicitly queued via `additionalSuites`.
+
+### Recognition pipeline
+
+The `recognition` suite (id `recognition`, phase `recognition`) runs a single
+check, `recognition.profile`, that iterates each `RecognizerSpec` configured on
+`VerifierConfig.recognizers` in registration order. The first recognizer whose
+`applies(subject)` returns true wins; subsequent recognizers are not consulted.
+
+A `RecognizerSpec` declares:
+
+```ts
+interface RecognizerSpec {
+  id: string;                                  // e.g. 'obv3p0.openbadge'
+  name: string;                                // human-readable
+  applies: (subject: VerificationSubject) => boolean;
+  parse: (credential: unknown) => RecognitionResult;
+}
+
+type RecognitionResult =
+  | { status: 'recognized'; profile: string; normalized: unknown }
+  | { status: 'malformed'; profile: string; problems: ProblemDetail[] };
+```
+
+The check returns success on `'recognized'` and failure on `'malformed'`. On
+success, the normalized credential and profile id flow through a side channel
+on the check payload so `verifier.ts` can lift them onto
+`CredentialVerificationResult.normalizedVerifiableCredential` and
+`CredentialVerificationResult.recognizedProfile`. Consumers narrow on
+`recognizedProfile` to access a typed view of the normalized credential.
+
+When no recognizers are configured the suite is a no-op (the `applies` check
+short-circuits) and contributes nothing to `results`. The `recognition` suite
+is in `defaultSuites` so OB recognition only requires passing recognizers via
+`VerifierConfig.recognizers` — there is no separate suite to wire in.
+
+Open Badges 3.0 ships two recognizers: `obv3p0Recognizer` (for
+`OpenBadgeCredential` / `AchievementCredential`) and
+`obv3p0EndorsementRecognizer` (for `EndorsementCredential`). They have mutually
+exclusive `applies` predicates so configuring both is safe.
+
+### The `applies` predicate
+
+A `VerificationSuite` may declare an `applies(subject, context)` predicate that
+the orchestrator consults after the phase filter. Behavior:
+
+- **Implicit (default suite list):** `applies` returning false silently skips
+  the suite — no entries appear in `results`.
+- **Explicit (suite passed via `additionalSuites`):** `applies` returning false
+  emits a single synthetic `<suite-id>.applies` `'skipped'` `CheckResult` so
+  the consumer sees their explicit request was acknowledged but not actionable.
+
+This is what lets a consumer queue `openBadgesSuite` against any credential
+type and still receive a clean signal in the result when the credential isn't
+an Open Badge — without the OB checks running and producing noise.
+
+### `ProblemDetail.instance` (RFC 9457 + RFC 6901)
+
+`ProblemDetail` carries an optional `instance` field aligned with
+[RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457). Failure-outcome
+problems from semantic and envelope checks populate `instance` with an
+[RFC 6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901)
+identifying the offending portion of the credential — built via the
+`formatJsonPointer` helper in `src/util/json-pointer.ts`.
+
+All four refactored OB semantic checks (`OB_INVALID_RESULT_REFERENCE`,
+`OB_INVALID_ACHIEVED_LEVEL`, `OB_MISSING_RESULT_STATUS`,
+`OB_UNKNOWN_ACHIEVEMENT_TYPE`) emit JSON Pointers (e.g.
+`/credentialSubject/result/0/resultDescription`). The strict OB envelope
+schemas convert each `ZodIssue.path` into a JSON Pointer via the shared
+`zodErrorToProblems` helper in `src/openbadges/schemas/fields-v3p0.ts`, so
+malformed-envelope problems are also pinpointed to the failing field.
 
 ### Adding a custom suite
 
@@ -325,14 +447,24 @@ A vertical submodule has three properties:
    creating a cycle.
 
 The `/openbadges` submodule exports three suite bundles
-(`openBadgesSuite`, `openBadgesSemanticSuite`, `openBadgesSchemaSuite`),
-individual checks, a factory for caller-augmented vocabulary
-(`createObv3UnknownAchievementTypeCheck`), recognition helpers, the OB-specific
-problem-type catalog, and version-scoped `AchievementType` vocabulary
+(`openBadgesSuite`, `openBadgesSemanticSuite`, `openBadgesSchemaSuite` — all
+tagged `phase: 'semantic'` and gated by an `applies` predicate that returns
+true only for OB credentials), individual checks, a factory for
+caller-augmented vocabulary (`createObv3UnknownAchievementTypeCheck`),
+recognition helpers, two `RecognizerSpec`s (`obv3p0Recognizer`,
+`obv3p0EndorsementRecognizer`) plus their strict envelope Zod schemas
+(`Obv3p0OpenBadgeCredentialSchema`, `Obv3p0EndorsementCredentialSchema`,
+along with their `parseObv3p0…` entry points), the OB-specific problem-type
+catalog, and version-scoped `AchievementType` vocabulary
 (`OB_3_0_ACHIEVEMENT_TYPES`, the moving `KNOWN_ACHIEVEMENT_TYPES` alias, and the
-spec-sanctioned `ACHIEVEMENT_TYPE_EXT_PREFIX = 'ext:'`). See the README's
+spec-sanctioned `ACHIEVEMENT_TYPE_EXT_PREFIX = 'ext:'`). The schemas are
+version-pinned to OB 3.0 so a future OB 3.1 schema can be introduced
+side-by-side with its own recognizer rather than mutating the 3.0 shape. See
+the README's
 [Open Badges 3.0 verification](../README.md#open-badges-30-verification-opt-in-submodule)
-section for the consumer-facing API.
+and
+[Credential recognition + two-pass verification](../README.md#credential-recognition--two-pass-verification)
+sections for the consumer-facing API.
 
 Future verticals (e.g. EU DCC, jurisdiction-specific trust frameworks, or
 issuer-specific extensions) follow the same pattern: a directory under
@@ -366,7 +498,9 @@ are simple type aliases for `VerifierConfig & VerifyXCall`.
 
 **`ProblemDetail`** is the structured error shape, inspired by RFC 9457 but without `status`
 (this is not an HTTP context). Every failure carries one or more `ProblemDetail` entries with a
-`type` URI, `title`, and `detail`.
+`type` URI, `title`, and `detail`. An optional `instance` field carries an RFC 6901 JSON
+Pointer locating the offending portion of the credential — see
+[`ProblemDetail.instance`](#problemdetailinstance-rfc-9457--rfc-6901).
 
 **`EntityIdentityRegistry`** is a discriminated union (`oidf` | `dcc-legacy` | `vc-recognition`)
 configuring which issuer registries to check. The `oidf` variant uses OpenID Federation trust
@@ -378,7 +512,14 @@ recognition VC issued by a trust authority.
 `verifyCredential` returns a `CredentialVerificationResult`:
 
 ```ts
-{ verified: boolean; verifiableCredential: VerifiableCredential; results: CheckResult[] }
+{
+  verified: boolean;
+  verifiableCredential: VerifiableCredential;
+  results: CheckResult[];
+  normalizedVerifiableCredential?: unknown;  // populated when a recognizer matched
+  recognizedProfile?: string;                // recognizer id (e.g. 'obv3p0.openbadge')
+  partial?: boolean;                         // true when caller passed `phases:`
+}
 ```
 
 `verifyPresentation` returns a `PresentationVerificationResult`:
@@ -389,6 +530,7 @@ recognition VC issued by a trust authority.
   verifiablePresentation: VerifiablePresentation;
   presentationResults: CheckResult[];
   credentialResults: CredentialVerificationResult[];
+  partial?: boolean;
 }
 ```
 
@@ -421,7 +563,10 @@ into the core `ProblemTypes` map. The first such catalog is
 `@digitalcredentials/verifier-core/openbadges`. Current OB entries:
 `OB_INVALID_RESULT_REFERENCE`, `OB_INVALID_ACHIEVED_LEVEL`,
 `OB_MISSING_RESULT_STATUS`, `OB_UNKNOWN_ACHIEVEMENT_TYPE`. The wire URIs use the
-`…#OB_*` shape so they remain stable across OB version updates.
+`…#OB_*` shape so they remain stable across OB version updates. Failure-outcome
+problems from these checks (and from the strict OB envelope schemas) populate
+`ProblemDetail.instance` with an RFC 6901 JSON Pointer locating the offending
+field.
 
 `ProblemDetail.type` itself stays typed as `string` so callers writing custom suites can emit
 their own URIs without requiring an entry in any catalog.

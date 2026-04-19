@@ -14,6 +14,7 @@
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
 - [Custom Suites](#custom-suites)
 - [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
+- [Credential recognition + two-pass verification](#credential-recognition--two-pass-verification)
 - [Architecture](#architecture)
 - [Migration from earlier 1.0.0-beta.x](#migration-from-earlier-100-betax)
 - [Install](#install)
@@ -32,12 +33,17 @@ Supports both [eddsa-rdfc-2022 Data Integrity Proof](https://github.com/digitalb
 
 Verification runs an ordered pipeline of **suites**, each containing one or more **checks**:
 
-| Suite | What it checks | Fatal? |
-|-------|---------------|--------|
-| **Core** | `@context` exists, VC context URI present, credential ID valid, proof exists | Yes |
-| **Proof** | Cryptographic signature verification | Yes |
-| **Status** | Revocation/suspension via BitstringStatusList | No |
-| **Registry** | Issuer DID lookup in known trust registries | No |
+| Suite | Phase | What it checks | Fatal? |
+|-------|-------|---------------|--------|
+| **Core** | `cryptographic` | `@context` exists, VC context URI present, resolve issuers, credential ID valid, proof exists | Yes |
+| **Recognition** | `recognition` | Pluggable credential-profile recognition; produces a normalized credential form (no-op when no recognizers configured) | No |
+| **Proof** | `cryptographic` | Cryptographic signature verification | Yes |
+| **Status** | `cryptographic` | Revocation/suspension via BitstringStatusList | No |
+| **Registry** | `trust` | Issuer DID lookup in known trust registries | No |
+
+The **Phase** column drives the optional `phases:` filter on
+`VerifierConfig` and per-call args, used for [two-pass
+verification](#credential-recognition--two-pass-verification).
 
 Open Badges 3.0 verification lives in the opt-in submodule
 [`@digitalcredentials/verifier-core/openbadges`](#open-badges-30-verification-opt-in-submodule)
@@ -470,6 +476,121 @@ const result = await verifier.verifyCredential({
 For version-pinned behavior, the `OB_3_0_ACHIEVEMENT_TYPES` set is exported
 directly so callers can build their own check against an explicit OB version
 rather than tracking the moving `KNOWN_ACHIEVEMENT_TYPES` alias.
+
+## Advanced: Credential recognition + two-pass verification
+
+`verifier-core` ships a **pluggable recognition pipeline**. Recognizers
+(e.g., `obv3p0Recognizer`, `obv3p0EndorsementRecognizer`) parse a
+credential's profile-specific shape and return a normalized form. The
+default `recognitionSuite` runs them in registration order and surfaces
+the first applies-true match on `CredentialVerificationResult` as
+`normalizedVerifiableCredential` + `recognizedProfile` — so consumers
+can branch on the recognized profile and reach a typed view of the
+credential without re-parsing.
+
+### End-to-end Open Badges wiring
+
+```ts
+import { createVerifier } from '@digitalcredentials/verifier-core';
+import {
+  obv3p0Recognizer,
+  obv3p0EndorsementRecognizer,
+  openBadgesSuite,
+} from '@digitalcredentials/verifier-core/openbadges';
+import type { Obv3p0OpenBadgeCredential } from '@digitalcredentials/verifier-core/openbadges';
+
+const verifier = createVerifier({
+  recognizers: [obv3p0Recognizer, obv3p0EndorsementRecognizer],
+});
+
+// One pass: full crypto + recognition + OB semantic checks.
+const presResult = await verifier.verifyPresentation({
+  presentation: vp,
+  additionalSuites: [openBadgesSuite],
+});
+
+for (const credResult of presResult.credentialResults) {
+  if (credResult.recognizedProfile === 'obv3p0.openbadge') {
+    const ob = credResult.normalizedVerifiableCredential as Obv3p0OpenBadgeCredential;
+    console.log('Achievement:', ob.credentialSubject);
+  }
+}
+```
+
+This is the recommended advanced integration shape for services like
+`dcc-transaction-service` that verify a presentation up front and then inspect
+each embedded credential's profile to drive downstream business logic. If
+performance matters, you're verifying high volumes of credentials, you want to
+show partial results to a user for verification in progress, or you have specific
+requirements for the verification process, this advanced integration pattern may
+be for you.
+
+### Two-pass verification
+
+When a credential has already been cryptographically verified — e.g.
+re-rendering a previously-verified credential, or running deeper semantic
+analysis on demand — the `phases:` filter lets you re-run only the work you
+need. Phases are `'cryptographic' | 'trust' | 'recognition' | 'semantic'`;
+requesting `'semantic'` automatically includes `'recognition'` so semantic
+checks can consume the normalized form.
+
+```ts
+// Pass 1 (default — every phase runs): full crypto + trust + recognition + semantic.
+const fullResult = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [openBadgesSuite],
+});
+
+// Pass 2: re-run only the semantic checks (recognition is auto-included).
+const semanticOnly = await verifier.verifyCredential({
+  credential,
+  additionalSuites: [openBadgesSuite],
+  phases: ['semantic'],
+});
+// semanticOnly.partial === true
+// semanticOnly.results contains only the recognition.profile + OB semantic check entries
+```
+
+`partial: true` is set on the result whenever the consumer passed an explicit
+`phases:` value, so downstream code can tell that the result covers only a
+subset of the pipeline. The default (no `phases:`) leaves `partial` unset —
+existing consumers see no change in result shape.
+
+### `applies` predicate contract
+
+A `VerificationSuite` may declare an `applies(subject, context)` predicate. The
+orchestrator uses it as follows:
+
+- **Implicit (default suite list):** if `applies` returns false, the suite is
+  silently skipped — no entries in `results`.
+- **Explicit (suite passed via `additionalSuites`):** if `applies` returns
+  false, a synthetic `<suite-id>.applies` `'skipped'` `CheckResult` is emitted
+  so the consumer sees their explicit request was acknowledged but not
+  actionable.
+
+This is what lets you queue `openBadgesSuite` against an arbitrary credential
+and still get a clear signal in the result when the credential isn't an Open
+Badge.
+
+### `ProblemDetail.instance` attribution
+
+Failure-outcome `ProblemDetail` entries from semantic and envelope checks carry
+an [RFC 6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901) on
+`instance`, locating the offending portion of the credential — aligned with [RFC
+9457](https://datatracker.ietf.org/doc/html/rfc9457). For example, an OB
+credential that names a `result.achievedLevel` not declared on the referenced
+`ResultDescription` produces:
+
+```ts
+{
+  type: 'https://www.w3.org/TR/vc-data-model#OB_INVALID_ACHIEVED_LEVEL',
+  title: 'Invalid Achieved Level',
+  detail: 'Result entry at index 0 claims achievedLevel "urn:lvl:NOT_REAL", ...',
+  instance: '/credentialSubject/result/0/achievedLevel',
+}
+```
+
+UI surfaces can highlight the exact field by walking the pointer.
 
 ## Architecture
 
