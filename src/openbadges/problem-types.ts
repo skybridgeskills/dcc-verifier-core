@@ -23,6 +23,18 @@ export const Obv3ProblemTypes = {
    */
   OB_INVALID_RESULT_REFERENCE:
     'https://www.w3.org/TR/vc-data-model#OB_INVALID_RESULT_REFERENCE',
+
+  /**
+   * Synthesized — a `Result.achievedLevel` value is not present in
+   * the `RubricCriterionLevel[].id` set of the `ResultDescription`
+   * the result references via `Result.resultDescription`. Also
+   * emitted when the referenced `ResultDescription` declares no
+   * `rubricCriterionLevel[]` (no addressable levels).
+   *
+   * Spec anchor: OBv3 §B.1.16.
+   */
+  OB_INVALID_ACHIEVED_LEVEL:
+    'https://www.w3.org/TR/vc-data-model#OB_INVALID_ACHIEVED_LEVEL',
 } as const;
 
 export type Obv3ProblemType =
