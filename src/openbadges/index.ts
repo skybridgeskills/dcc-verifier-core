@@ -58,6 +58,12 @@ export {
 export { obv3p0Recognizer } from './recognizers.js';
 
 export {
+  Obv3p0OpenBadgeCredentialSchema,
+  parseObv3p0OpenBadgeCredential,
+} from './schemas/openbadge-credential-v3p0.js';
+export type { Obv3p0OpenBadgeCredential } from './schemas/openbadge-credential-v3p0.js';
+
+export {
   Obv3ProblemTypes as OpenBadgesProblemTypes,
   Obv3ProblemTypes,
 } from './problem-types.js';

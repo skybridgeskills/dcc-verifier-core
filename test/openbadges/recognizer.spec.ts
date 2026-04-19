@@ -1,10 +1,10 @@
 /**
- * Phase-1 spec for `obv3p0Recognizer`.
+ * Spec for `obv3p0Recognizer` — the `applies` predicate plus the
+ * `parse` function's wiring to {@link parseObv3p0OpenBadgeCredential}.
  *
- * The Phase-1 implementation is intentionally a stub that echoes
- * the credential as the `normalized` value when the credential
- * matches `isOpenBadgeCredential`. Phase 2 swaps the parse for a
- * real envelope schema and this spec will be extended.
+ * Detailed envelope behavior is exercised in
+ * `schema/envelope-v3p0.spec.ts`; this spec asserts the recognizer
+ * surface itself.
  */
 
 import { expect } from 'chai';
@@ -51,12 +51,33 @@ describe('obv3p0Recognizer', () => {
     expect(obv3p0Recognizer.applies(endorsement, ctx)).to.be.false;
   });
 
-  it('parse() returns recognized with the credential as normalized (Phase 1 stub)', () => {
+  it('parse() recognizes a spec-conforming OB 3.0 credential', () => {
     const result = obv3p0Recognizer.parse(sampleAchievementCredential);
     expect(result.status).to.equal('recognized');
     if (result.status === 'recognized') {
       expect(result.profile).to.equal('obv3p0.openbadge');
-      expect(result.normalized).to.equal(sampleAchievementCredential);
+      const normalized = result.normalized as { id: string };
+      expect(normalized.id).to.equal(
+        (sampleAchievementCredential as { id: string }).id,
+      );
+    }
+  });
+
+  it('parse() reports malformed when the envelope is invalid', () => {
+    const malformed = {
+      '@context': [
+        'https://www.w3.org/ns/credentials/v2',
+        'https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json',
+      ],
+      type: ['VerifiableCredential', 'OpenBadgeCredential'],
+      // missing id, issuer, validFrom, credentialSubject
+    };
+
+    const result = obv3p0Recognizer.parse(malformed);
+    expect(result.status).to.equal('malformed');
+    if (result.status === 'malformed') {
+      expect(result.profile).to.equal('obv3p0.openbadge');
+      expect(result.problems.length).to.be.greaterThan(0);
     }
   });
 });
