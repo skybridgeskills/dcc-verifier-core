@@ -18,7 +18,11 @@ import {
   VCDM_V1_CONTEXT,
   VCDM_V2_CONTEXT,
 } from './fields-v3p0.js';
-import { ImageField, ProfileRefField } from './classes-v3p0.js';
+import {
+  ImageField,
+  Obv3p0AchievementSubjectSchema,
+  ProfileRefField,
+} from './classes-v3p0.js';
 import type { ProblemDetail } from '../../types/problem-detail.js';
 import type { RecognitionResult } from '../../types/recognition.js';
 import { formatJsonPointer } from '../../util/json-pointer.js';
@@ -63,7 +67,7 @@ export const Obv3p0OpenBadgeCredentialSchema = z
     validFrom: z.string().datetime({ offset: true }).optional(),
     validUntil: z.string().datetime({ offset: true }).optional(),
     image: ImageField().optional(),
-    credentialSubject: z.object({}).passthrough(),
+    credentialSubject: Obv3p0AchievementSubjectSchema,
   })
   .passthrough()
   .superRefine((cred, ctx) => {

@@ -185,4 +185,63 @@ export const Obv3p0AchievementSchema = z
   .passthrough();
 
 export type Obv3p0Achievement = z.infer<typeof Obv3p0AchievementSchema>;
+
+/**
+ * Open Badges 3.0 §B.1.12 — IdentityObject (file-local).
+ *
+ * Used inside `AchievementSubject.identifier[]` entries. Kept
+ * light per Q4.c — passthrough with a required `type`
+ * discriminator. Full hashed-identity validation (§9.3) is out of
+ * scope.
+ */
+const Obv3p0IdentityObjectSchema = z
+  .object({
+    type: JsonLdTypeField(['IdentityObject']),
+  })
+  .passthrough();
+
+/**
+ * Open Badges 3.0 §B.1.3 — AchievementSubject class.
+ *
+ * Required: `type` (must include `'AchievementSubject'`),
+ * `achievement`.
+ *
+ * **At-least-one refinement**: per spec the recipient must be
+ * identified by `id` (an IRI) **or** by a non-empty `identifier[]`
+ * (structured identifier objects). Both are also permitted. The
+ * refinement raises a single problem at the subject root path
+ * when neither is present, which surfaces as
+ * `/credentialSubject` once backfilled into the envelope.
+ *
+ * Optional in scope: `result[]` (passthrough until Phase 7),
+ * `image` (normalized via {@link ImageField}), `identifier[]`
+ * (entries kept light per the IdentityObject note above).
+ */
+export const Obv3p0AchievementSubjectSchema = z
+  .object({
+    type: JsonLdTypeField(['AchievementSubject']),
+    achievement: Obv3p0AchievementSchema,
+    id: z.string().url().optional(),
+    identifier: z.array(Obv3p0IdentityObjectSchema).optional(),
+    result: z.array(z.object({}).passthrough()).optional(),
+    image: ImageField().optional(),
+  })
+  .passthrough()
+  .superRefine((subject, ctx) => {
+    const hasId = typeof subject.id === 'string' && subject.id.length > 0;
+    const hasIdentifier =
+      Array.isArray(subject.identifier) && subject.identifier.length > 0;
+    if (!hasId && !hasIdentifier) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [],
+        message:
+          'AchievementSubject requires either id or non-empty identifier[]',
+      });
+    }
+  });
+
+export type Obv3p0AchievementSubject = z.infer<
+  typeof Obv3p0AchievementSubjectSchema
+>;
 /* eslint-enable @typescript-eslint/explicit-function-return-type */

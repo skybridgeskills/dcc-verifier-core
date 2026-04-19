@@ -70,12 +70,14 @@ export {
   ProfileRefField,
   Obv3p0AlignmentSchema,
   Obv3p0AchievementSchema,
+  Obv3p0AchievementSubjectSchema,
 } from './schemas/classes-v3p0.js';
 export type {
   Obv3p0Image,
   Obv3p0Profile,
   Obv3p0Alignment,
   Obv3p0Achievement,
+  Obv3p0AchievementSubject,
 } from './schemas/classes-v3p0.js';
 
 export {
