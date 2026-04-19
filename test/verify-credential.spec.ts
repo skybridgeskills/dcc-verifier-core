@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { verifyCredential } from '../src/index.js';
+import { openBadgesSchemaSuite } from '../src/openbadges/index.js';
 import { VerificationCheck, CheckOutcome } from '../src/types/check.js';
 import {
   CredentialFactory,
@@ -248,15 +249,29 @@ describe('verifyCredential', () => {
   });
 
   describe('OBv3 credentials', () => {
-    it('processes OpenBadgeCredential', async () => {
+    it('does not run OpenBadges checks by default (opt-in)', async () => {
       const credential = CredentialFactory({ credential: {} });
       const result = await verifyCredential({ credential, ...fakeVerified });
+
+      const obResults = result.results.filter(
+        r => r.suite === 'schema.obv3' || r.suite.startsWith('openbadges'),
+      );
+      expect(obResults).to.have.lengthOf(0);
+    });
+
+    it('processes OpenBadgeCredential when openBadgesSchemaSuite is opted in', async () => {
+      const credential = CredentialFactory({ credential: {} });
+      const result = await verifyCredential({
+        credential,
+        additionalSuites: [openBadgesSchemaSuite],
+        ...fakeVerified,
+      });
 
       expect(result.verified).to.be.a('boolean');
       expect(result.results).to.be.an('array');
 
-      const obv3Results = result.results.filter(r => r.suite === 'schema.obv3');
-      expect(obv3Results.length).to.be.greaterThan(0);
+      const obSchemaResults = result.results.filter(r => r.suite === 'openbadges.schema');
+      expect(obSchemaResults.length).to.be.greaterThan(0);
     });
   });
 

@@ -27,6 +27,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./openbadges": {
+      "types": "./dist/openbadges/index.d.ts",
+      "default": "./dist/openbadges/index.js"
     }
   },
   "files": [

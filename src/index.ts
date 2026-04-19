@@ -53,7 +53,6 @@ export { coreSuite } from './suites/core/index.js';
 export { proofSuite } from './suites/proof/index.js';
 export { statusSuite } from './suites/status/index.js';
 export { registrySuite } from './suites/registry/index.js';
-export { obv3SchemaSuite } from './suites/schema/index.js';
 
 // ==================== Extension points ====================
 
