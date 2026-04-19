@@ -13,10 +13,11 @@
  * - **`JsonLdTypeField(requiredTypes)`** — normalizes `string |
  *   string[]` to `string[]` and refines that every value in
  *   `requiredTypes` is present.
- * - **`ProfileRefField()`** — normalizes `string | { id: string,
- *   ...rest }` to `{ id: string, ...rest }`. Phase 2 placeholder
- *   for a future Phase-4 `Obv3p0Profile` schema; the call sites
- *   stay the same when the inner shape gets richer.
+ *
+ * Class-coupled field builders (`ImageField`, `ProfileRefField`)
+ * live alongside their schemas in `classes-v3p0.ts` to avoid an
+ * ESM circular import (the schemas use `JsonLdTypeField` at
+ * module-evaluation time).
  */
 
 import { z } from 'zod';
@@ -57,20 +58,6 @@ export function JsonLdTypeField(requiredTypes: readonly string[]) {
         }
       }
     });
-}
-
-/**
- * Profile reference: `string | { id, ...rest }` → `{ id, ...rest }`.
- *
- * Phase-2 placeholder. Phase 4 introduces the real `Obv3p0Profile`
- * schema and replaces the inner object shape; call sites stay the
- * same.
- */
-export function ProfileRefField() {
-  const ProfileObject = z.object({ id: IriString }).passthrough();
-  return z
-    .union([IriString, ProfileObject])
-    .transform(v => (typeof v === 'string' ? { id: v } : v));
 }
 
 /* eslint-enable @typescript-eslint/explicit-function-return-type */

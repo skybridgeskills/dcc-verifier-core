@@ -15,11 +15,10 @@ import {
   IriString,
   JsonLdTypeField,
   OB_3_0_CONTEXT_PREFIX,
-  ProfileRefField,
   VCDM_V1_CONTEXT,
   VCDM_V2_CONTEXT,
 } from './fields-v3p0.js';
-import { ImageField } from './classes-v3p0.js';
+import { ImageField, ProfileRefField } from './classes-v3p0.js';
 import type { ProblemDetail } from '../../types/problem-detail.js';
 import type { RecognitionResult } from '../../types/recognition.js';
 import { formatJsonPointer } from '../../util/json-pointer.js';

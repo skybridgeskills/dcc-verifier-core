@@ -61,4 +61,58 @@ export function ImageField() {
     Obv3p0ImageSchema,
   ]);
 }
+
+/**
+ * Open Badges 3.0 §B.1.14 — Profile class.
+ *
+ * Required: `id` (IRI; DIDs accepted), `type` (must include
+ * `'Profile'`).
+ *
+ * In-scope optional fields per the design (Q4.c): `name`, `url`,
+ * `description`, `image`, `email`. Email validation is light
+ * (`@`-presence) — full RFC-5321 conformance is out of scope.
+ *
+ * Recursive Profile-typed fields (e.g. `parentOrg`) stay
+ * passthrough; supporting them needs `z.lazy()` and is out of
+ * scope per the parent plan's Q4.c.
+ *
+ * `id` uses {@link IriString} rather than `z.string().url()` so
+ * `did:`-prefixed identifiers (the most common issuer form) are
+ * accepted. `url` (a webpage URL) keeps `z.string().url()`.
+ */
+export const Obv3p0ProfileSchema = z
+  .object({
+    id: IriString,
+    type: JsonLdTypeField(['Profile']),
+    name: z.string().optional(),
+    url: z.string().url().optional(),
+    description: z.string().optional(),
+    image: ImageField().optional(),
+    email: z
+      .string()
+      .refine(s => s.includes('@'), { message: 'email must contain "@"' })
+      .optional(),
+  })
+  .passthrough();
+
+export type Obv3p0Profile = z.infer<typeof Obv3p0ProfileSchema>;
+
+/**
+ * Field builder for Profile-valued slots (issuer, creator, etc.).
+ *
+ * OB 3.0 permits a Profile-typed property to be either:
+ * - a string IRI, or
+ * - a full Profile object.
+ *
+ * Normalizes the string form to `{ id, type: ['Profile'] }` so
+ * consumers can always treat the value as an object.
+ *
+ * Replaces the Phase-2 placeholder in `fields-v3p0.ts`.
+ */
+export function ProfileRefField() {
+  return z.union([
+    IriString.transform(id => ({ id, type: ['Profile'] })),
+    Obv3p0ProfileSchema,
+  ]);
+}
 /* eslint-enable @typescript-eslint/explicit-function-return-type */
