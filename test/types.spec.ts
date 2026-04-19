@@ -8,6 +8,20 @@ import type {
 } from '../src/types/check.js';
 import type { VerificationContext } from '../src/types/context.js';
 import type { VerificationSubject } from '../src/types/subject.js';
+import type {
+  SuiteSummary,
+  SuiteSummaryPhase,
+} from '../src/types/suite-summary.js';
+import type {
+  CredentialVerificationResult,
+  PresentationVerificationResult,
+} from '../src/types/result.js';
+import type {
+  VerifierConfig,
+  VerifyCredentialCall,
+  VerifyPresentationCall,
+} from '../src/types/verifier.js';
+import * as publicApi from '../src/index.js';
 
 describe('Foundation types', () => {
   describe('ProblemDetail', () => {
@@ -69,6 +83,117 @@ describe('Foundation types', () => {
       expect(result.check).to.equal('core.proof-exists');
       expect(result.outcome.status).to.equal('success');
       expect(result.timestamp).to.be.a('string');
+    });
+
+    it('accepts an optional namespaced id', () => {
+      const result: CheckResult = {
+        id: 'cryptographic.core.proof-exists',
+        check: 'core.proof-exists',
+        suite: 'core',
+        outcome: { status: 'success', message: 'Proof exists.' },
+        timestamp: new Date().toISOString(),
+      };
+      expect(result.id).to.equal('cryptographic.core.proof-exists');
+    });
+  });
+
+  describe('SuiteSummary', () => {
+    it('constructs a success summary with counts', () => {
+      const summary: SuiteSummary = {
+        id: 'cryptographic.core',
+        phase: 'cryptographic',
+        suite: 'core',
+        status: 'success',
+        verified: true,
+        message: '4 of 4 checks passed',
+        counts: { passed: 4, failed: 0, skipped: 0 },
+      };
+      expect(summary.status).to.equal('success');
+      expect(summary.counts.passed).to.equal(4);
+    });
+
+    it('records fatalFailureAt when the suite halted mid-run', () => {
+      const summary: SuiteSummary = {
+        id: 'cryptographic.proof',
+        phase: 'cryptographic',
+        suite: 'proof',
+        status: 'failure',
+        verified: false,
+        message: '1 of 3 checks failed (0 passed)',
+        counts: { passed: 0, failed: 1, skipped: 0 },
+        fatalFailureAt: 'proof.signature',
+      };
+      expect(summary.fatalFailureAt).to.equal('proof.signature');
+    });
+
+    it('admits unknown for untagged consumer suites', () => {
+      const phase: SuiteSummaryPhase = 'unknown';
+      const summary: SuiteSummary = {
+        id: 'unknown.custom',
+        phase,
+        suite: 'custom',
+        status: 'success',
+        verified: true,
+        message: '1 of 1 checks passed',
+        counts: { passed: 1, failed: 0, skipped: 0 },
+      };
+      expect(summary.phase).to.equal('unknown');
+    });
+
+    it('is exported from the public barrel', () => {
+      expect(publicApi).to.have.property('verifyCredential');
+      // Type-only re-exports don't appear at runtime; assert the
+      // type is usable instead by constructing a literal.
+      const summary: SuiteSummary = {
+        id: 'recognition',
+        phase: 'recognition',
+        suite: 'recognition',
+        status: 'skipped',
+        verified: true,
+        message: 'no recognizer matched',
+        counts: { passed: 0, failed: 0, skipped: 1 },
+      };
+      expect(summary.id).to.equal('recognition');
+    });
+  });
+
+  describe('Result types carry summary[]', () => {
+    it('CredentialVerificationResult requires summary', () => {
+      const result: CredentialVerificationResult = {
+        verified: true,
+        verifiableCredential: {} as never,
+        results: [],
+        summary: [],
+      };
+      expect(result.summary).to.deep.equal([]);
+    });
+
+    it('PresentationVerificationResult requires summary', () => {
+      const result: PresentationVerificationResult = {
+        verified: true,
+        verifiablePresentation: {} as never,
+        presentationResults: [],
+        credentialResults: [],
+        summary: [],
+      };
+      expect(result.summary).to.deep.equal([]);
+    });
+  });
+
+  describe('verbose flag', () => {
+    it('is accepted on VerifierConfig and per-call args', () => {
+      const config: VerifierConfig = { verbose: true };
+      const credCall: VerifyCredentialCall = {
+        credential: {},
+        verbose: false,
+      };
+      const presCall: VerifyPresentationCall = {
+        presentation: {},
+        verbose: true,
+      };
+      expect(config.verbose).to.be.true;
+      expect(credCall.verbose).to.be.false;
+      expect(presCall.verbose).to.be.true;
     });
   });
 

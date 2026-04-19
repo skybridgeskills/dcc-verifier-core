@@ -13,6 +13,7 @@
   - [verifyPresentation](#verifypresentation)
   - [createVerifier (batch / repeated verification)](#createverifier-batch--repeated-verification)
 - [Custom Suites](#custom-suites)
+- [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)
 - [Open Badges 3.0 verification (opt-in submodule)](#open-badges-30-verification-opt-in-submodule)
 - [Credential recognition + two-pass verification](#credential-recognition--two-pass-verification)
 - [Architecture](#architecture)
@@ -112,10 +113,15 @@ interface CredentialVerificationResult {
   verified: boolean;
   verifiableCredential: VerifiableCredential;
   results: CheckResult[];
+  summary: SuiteSummary[];
 }
 ```
 
-`verified` is `true` when no check returned a failure. Every check that ran (or was skipped) appears in `results`, so the report is always complete.
+`verified` is `true` when no check returned a failure. By default (since
+v2.0.0) `results` carries only failures and explicit
+`<suite>.applies` skips, while `summary` provides the per-suite rollup
+(see [Verbose mode and folded summaries](#verbose-mode-and-folded-summaries)).
+Pass `verbose: true` to receive every check that ran in `results`.
 
 Each `CheckResult` contains a discriminated `CheckOutcome`:
 
@@ -296,9 +302,15 @@ interface PresentationVerificationResult {
   verifiablePresentation: VerifiablePresentation;
   presentationResults: CheckResult[];
   credentialResults: CredentialVerificationResult[];
+  summary: SuiteSummary[];
   // No allResults — use flattenPresentationResults(result)
 }
 ```
+
+`presentationResults` and each embedded `credentialResults[i].results`
+follow the same folded-by-default shape as `verifyCredential`'s
+`results`. The top-level `summary` rolls up the VP envelope's own
+suites; per-credential rollups live on `credentialResults[i].summary`.
 
 Presentation verification does two things:
 
@@ -391,6 +403,31 @@ const result = await verifyCredential({
 ```
 
 Custom suites run after the default suites. Each check receives the same `VerificationSubject` and `VerificationContext` as built-in checks.
+
+## Verbose mode and folded summaries
+
+Each `CredentialVerificationResult` and `PresentationVerificationResult`
+carries a `summary: SuiteSummary[]` rollup of per-suite outcomes. By
+default (since v2.0.0), `results[]` carries only failures and explicit
+`<suite>.applies` skips; pass `verbose: true` to keep every check in
+`results[]`.
+
+```ts
+const result = await verifier.verifyCredential({ credential });
+// result.summary[i] = { id, phase, suite, status, verified, message, counts, ... }
+// result.results[]  = failures + explicit skips only
+
+const verbose = await verifier.verifyCredential({ credential, verbose: true });
+// verbose.results[] carries every check that ran, with .id populated.
+```
+
+`verbose` is also accepted on `createVerifier(...)` as an instance
+default; per-call values win when both are set.
+
+See [`docs/api/verification-results.md`](./docs/api/verification-results.md)
+for the full reference (phase model, `SuiteSummary` fields, `id`
+namespace, UI rendering recipe, and a prompt-ready appendix for
+downstream UIs).
 
 ## Open Badges 3.0 verification (opt-in submodule)
 

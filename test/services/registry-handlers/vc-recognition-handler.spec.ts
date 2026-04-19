@@ -117,6 +117,7 @@ describe('lookupVcRecognition', () => {
           verified: false,
           verifiableCredential: {} as VerifiableCredential,
           results: [],
+          summary: [],
         }) satisfies CredentialVerificationResult,
     });
     const ctx = buildCtx({
@@ -140,6 +141,7 @@ describe('lookupVcRecognition', () => {
           verified: true,
           verifiableCredential: {} as VerifiableCredential,
           results: [],
+          summary: [],
         } satisfies CredentialVerificationResult;
       },
     });
@@ -160,6 +162,7 @@ describe('lookupVcRecognition', () => {
           verified: true,
           verifiableCredential: {} as VerifiableCredential,
           results: [],
+          summary: [],
         } satisfies CredentialVerificationResult;
       },
     });

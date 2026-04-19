@@ -16,8 +16,12 @@ import { FakeDocumentLoader } from './factories/services/fake-document-loader.js
 import { v1Expired } from './fixtures/v1-expired.js';
 import { v2Expired } from './fixtures/v2-expired.js';
 
+// ests in this file ensure spec completion by inspecting every check in
+// `result.results`. Use a verbose verifier to enable these checks; folded-mode
+// coverage lives in `describe('folded vs verbose shape', …)` below.
 const fakeVerified = {
   cryptoServices: [FakeCryptoService({ verified: true })],
+  verbose: true,
 };
 
 describe('verifyCredential', () => {
@@ -353,6 +357,70 @@ describe('verifyCredential', () => {
 
       expect(result.verified).to.be.a('boolean');
       expect(result.verifiableCredential.issuer).to.be.an('object');
+    });
+  });
+
+  describe('folded vs verbose shape', () => {
+    const cryptoOnly = {
+      cryptoServices: [FakeCryptoService({ verified: true })],
+    };
+
+    it('default (verbose unset): folds successes; results[] has only failures + explicit skips', async () => {
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const result = await verifyCredential({ credential, ...cryptoOnly });
+
+      expect(result.verified).to.be.true;
+      expect(result.results).to.deep.equal([]);
+      expect(result.summary.length).to.be.greaterThan(0);
+      expect(result.summary.every(s => s.verified)).to.be.true;
+      const ids = new Set(result.summary.map(s => s.id));
+      expect(ids).to.include('cryptographic.core');
+      expect(ids).to.include('cryptographic.proof');
+    });
+
+    it('verbose: true: results[] carries every check, summary[] identical to folded mode', async () => {
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const folded = await verifyCredential({ credential, ...cryptoOnly });
+      const verbose = await verifyCredential({
+        credential,
+        ...cryptoOnly,
+        verbose: true,
+      });
+
+      expect(verbose.results.length).to.be.greaterThan(0);
+      expect(verbose.results.every(r => r.id !== undefined)).to.be.true;
+      expect(verbose.summary.map(s => s.id)).to.deep.equal(
+        folded.summary.map(s => s.id),
+      );
+      expect(verbose.summary.map(s => s.status)).to.deep.equal(
+        folded.summary.map(s => s.status),
+      );
+      expect(verbose.verified).to.equal(folded.verified);
+    });
+
+    it('failure path (folded): results[] surfaces just the proof failure; summary marks proof as failure', async () => {
+      const credential = CredentialFactory({ version: 'v1', credential: {} });
+      const result = await verifyCredential({
+        credential,
+        cryptoServices: [FakeCryptoService({ verified: false })],
+      });
+
+      expect(result.verified).to.be.false;
+      expect(result.results.every(r => r.outcome.status === 'failure')).to.be.true;
+      const proofSummary = result.summary.find(s => s.suite === 'proof');
+      expect(proofSummary?.status).to.be.oneOf(['failure', 'mixed']);
+      expect(proofSummary?.verified).to.be.false;
+    });
+
+    it('parse error: result has one summary entry tagged cryptographic.parsing', async () => {
+      const result = await verifyCredential({ credential: 'bogus' });
+
+      expect(result.verified).to.be.false;
+      expect(result.summary).to.have.lengthOf(1);
+      expect(result.summary[0].id).to.equal('cryptographic.parsing');
+      expect(result.summary[0].status).to.equal('failure');
+      expect(result.results).to.have.lengthOf(1);
+      expect(result.results[0].id).to.equal('cryptographic.parsing.envelope');
     });
   });
 });

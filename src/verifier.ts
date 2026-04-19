@@ -45,12 +45,14 @@ import type {
   CredentialVerificationResult,
   PresentationVerificationResult,
 } from './types/result.js';
+import type { SuiteSummary } from './types/suite-summary.js';
 import { parseCredential, VerifiableCredential } from './schemas/credential.js';
 import { parsePresentation, type VerifiablePresentation } from './schemas/presentation.js';
 import { runSuites } from './run-suites.js';
 import { extractCredentialsFrom } from './extract-credentials-from.js';
 import { defaultSuites } from './default-suites.js';
 import { proofSuite } from './suites/proof/index.js';
+import { computeId, foldCheckResults } from './fold-results.js';
 import {
   defaultHttpGetService,
   createDefaultCacheService,
@@ -73,6 +75,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
   const constructorRegistries = config.registries;
   const recognizers = config.recognizers ?? [];
   const constructorPhases = config.phases;
+  const constructorVerbose = config.verbose;
 
   // Forward-declared verifier reference. The lookupIssuers thunk closes
   // over this slot so handlers can recursively call back into the
@@ -118,20 +121,34 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
       const explicitSuiteIds = new Set(additionalSuites.map(s => s.id));
       const requestedPhases = call.phases ?? constructorPhases;
       const effectivePhases = expandPhases(requestedPhases);
-      const results = await runSuites(
+      const rawChecks = await runSuites(
         suites,
         { verifiableCredential: parsedCredential },
         ctx,
         { explicitSuiteIds, phases: effectivePhases },
       );
 
-      const recognized = extractRecognition(results);
+      // Lift recognition payload before folding so the lifted form
+      // survives even when the recognition CheckResult is folded
+      // away in non-verbose mode.
+      const recognized = extractRecognition(rawChecks);
+
+      // Populate `id` on every check before folding so the per-check
+      // `id` and the matching `SuiteSummary.id` derive from one
+      // computation. Verbose-mode consumers also see `id`.
+      populateCheckIds(rawChecks, suites);
+
+      const verbose =
+        call.verbose ?? constructorVerbose ?? false;
+      const folded = foldCheckResults(rawChecks, suites, { verbose });
+
       const result: CredentialVerificationResult = {
-        verified: !hasFatalFailures(results),
+        verified: !hasFatalFailures(rawChecks),
         verifiableCredential: parsedCredential,
         normalizedVerifiableCredential: recognized?.normalized,
         recognizedProfile: recognized?.profile,
-        results,
+        results: folded.results,
+        summary: folded.summaries,
       };
       if (requestedPhases !== undefined) result.partial = true;
       return result;
@@ -165,11 +182,21 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
       const explicitSuiteIds = new Set(additionalSuites.map(s => s.id));
       const requestedPhases = call.phases ?? constructorPhases;
       const effectivePhases = expandPhases(requestedPhases);
-      const presentationResults = await runSuites(
+      const rawPresentationChecks = await runSuites(
         presentationSuites,
         { verifiablePresentation: parsedPresentation },
         ctx,
         { explicitSuiteIds, phases: effectivePhases },
+      );
+
+      populateCheckIds(rawPresentationChecks, presentationSuites);
+
+      const verbose =
+        call.verbose ?? constructorVerbose ?? false;
+      const foldedPresentation = foldCheckResults(
+        rawPresentationChecks,
+        presentationSuites,
+        { verbose },
       );
 
       const credentials = extractCredentialsFrom(parsedPresentation);
@@ -184,19 +211,26 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
               // default reapplies inside the recursive call.
               registries: call.registries,
               phases: call.phases,
+              // Propagate explicitly so embedded credentials use the
+              // same verbosity as this presentation call (otherwise
+              // the recursive call would re-evaluate from
+              // constructorVerbose, which usually matches but can
+              // diverge if the per-call `verbose` overrode it here).
+              verbose,
             }),
           );
         }
       }
 
-      const presentationVerified = !hasFatalFailures(presentationResults);
+      const presentationVerified = !hasFatalFailures(rawPresentationChecks);
       const allCredentialsVerified = credentialResults.every(cr => cr.verified);
 
       const result: PresentationVerificationResult = {
         verified: presentationVerified && allCredentialsVerified,
         verifiablePresentation: parsedPresentation,
-        presentationResults,
+        presentationResults: foldedPresentation.results,
         credentialResults,
+        summary: foldedPresentation.summaries,
       };
       if (requestedPhases !== undefined) result.partial = true;
       return result;
@@ -248,6 +282,23 @@ function hasFatalFailures(results: CheckResult[]): boolean {
 }
 
 /**
+ * Populate `id` on every `CheckResult` using {@link computeId} so
+ * folded summaries and verbose-mode consumers both see the
+ * dot-separated namespace. Mutates each result in place; called
+ * after `runSuites` returns and before {@link foldCheckResults}.
+ */
+function populateCheckIds(
+  checks: CheckResult[],
+  suites: VerificationSuite[],
+): void {
+  const phaseBySuiteId = new Map<string, SuitePhase | undefined>();
+  for (const s of suites) phaseBySuiteId.set(s.id, s.phase);
+  for (const c of checks) {
+    c.id = computeId(phaseBySuiteId.get(c.suite), c.suite, c.check);
+  }
+}
+
+/**
  * Apply the auto-include rule for phase requests: if `'semantic'`
  * is requested without `'recognition'`, add `'recognition'` so
  * semantic checks have access to the normalized credential form
@@ -287,14 +338,48 @@ function extractRecognition(
   return { profile: payload.profile, normalized: payload.normalized };
 }
 
+/**
+ * Synthetic suite definition used solely so the parse-error
+ * `CheckResult` folds into a meaningful `SuiteSummary`. Tagged
+ * `'cryptographic'` so UI sections that group by phase show
+ * structural failures alongside other foundational checks.
+ */
+const PARSING_SUITE: VerificationSuite = {
+  id: 'parsing',
+  name: 'Envelope parsing',
+  phase: 'cryptographic',
+  checks: [
+    {
+      id: 'parsing.envelope',
+      name: 'Parse credential / presentation envelope',
+      fatal: true,
+      execute: async () => ({ status: 'failure', problems: [] }),
+    },
+  ],
+};
+
 function parseErrorResult(problem: ProblemDetail): CheckResult {
-  return {
+  const result: CheckResult = {
     suite: 'parsing',
     check: 'parsing.envelope',
     outcome: { status: 'failure', problems: [problem] },
     timestamp: new Date().toISOString(),
     fatal: true,
   };
+  result.id = computeId(PARSING_SUITE.phase, 'parsing', 'parsing.envelope');
+  return result;
+}
+
+/**
+ * Build the one-entry `summary[]` that accompanies every
+ * parse-error result. The single check is always a fatal failure,
+ * so the summary always has `status: 'failure'`,
+ * `verified: false`. We surface the parse error in `results[]`
+ * regardless of `verbose` (a parse error is unusable without it).
+ */
+function parseErrorSummary(check: CheckResult): SuiteSummary[] {
+  const folded = foldCheckResults([check], [PARSING_SUITE], { verbose: true });
+  return folded.summaries;
 }
 
 function parseFailureCredentialResult(
@@ -306,10 +391,12 @@ function parseFailureCredentialResult(
     title: 'Credential Parsing Failed',
     detail: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
   };
+  const check = parseErrorResult(problem);
   return {
     verified: false,
     verifiableCredential: credential as VerifiableCredential,
-    results: [parseErrorResult(problem)],
+    results: [check],
+    summary: parseErrorSummary(check),
   };
 }
 
@@ -322,11 +409,12 @@ function parseFailurePresentationResult(
     title: 'Presentation Parsing Failed',
     detail: error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; '),
   };
-  const result = parseErrorResult(problem);
+  const check = parseErrorResult(problem);
   return {
     verified: false,
     verifiablePresentation: presentation as VerifiablePresentation,
-    presentationResults: [result],
+    presentationResults: [check],
     credentialResults: [],
+    summary: parseErrorSummary(check),
   };
 }

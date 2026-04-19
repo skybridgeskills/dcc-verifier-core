@@ -5,8 +5,13 @@ import { CredentialFactory } from './factories/data/credential-factory.js';
 import { PresentationFactory } from './factories/data/presentation-factory.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 
+// Existing tests in this file inspect every check in
+// `result.results` / `result.presentationResults`. Use a verbose
+// verifier to keep those assertions valid; folded-mode coverage
+// lives in `describe('folded vs verbose shape', …)` below.
 const fakeVerified = {
   cryptoServices: [FakeCryptoService({ verified: true })],
+  verbose: true,
 };
 
 describe('verifyPresentation', () => {
@@ -266,6 +271,135 @@ describe('verifyPresentation', () => {
         expect(typeof credResult.verified).to.equal('boolean');
         expect(credResult.verifiableCredential).to.be.an('object');
         expect(Array.isArray(credResult.results)).to.be.true;
+      }
+    });
+  });
+
+  describe('folded vs verbose shape', () => {
+    const cryptoOnly = {
+      cryptoServices: [FakeCryptoService({ verified: true })],
+    };
+
+    it('default folded happy path: every credential summary green; results[] empty', async () => {
+      const presentation = PresentationFactory();
+      const result = await verifyPresentation({ presentation, ...cryptoOnly });
+
+      expect(result.verified).to.be.true;
+      expect(result.presentationResults).to.deep.equal([]);
+      expect(result.summary.length).to.be.greaterThan(0);
+      expect(result.summary.every(s => s.verified)).to.be.true;
+
+      expect(result.credentialResults).to.have.lengthOf(1);
+      const cred = result.credentialResults[0];
+      expect(cred.results).to.deep.equal([]);
+      expect(cred.summary.length).to.be.greaterThan(0);
+      expect(cred.summary.every(s => s.verified)).to.be.true;
+    });
+
+    it('verbose: presentation propagates verbose to embedded credentials', async () => {
+      const presentation = PresentationFactory();
+      const result = await verifyPresentation({
+        presentation,
+        ...cryptoOnly,
+        verbose: true,
+      });
+
+      expect(result.presentationResults.length).to.be.greaterThan(0);
+      const cred = result.credentialResults[0];
+      expect(cred.results.length).to.be.greaterThan(0);
+      expect(cred.results.every(r => r.id !== undefined)).to.be.true;
+    });
+  });
+
+  describe('mixed-result fixture (UI use case)', () => {
+    const cryptoOnly = {
+      cryptoServices: [FakeCryptoService({ verified: true })],
+    };
+
+    function buildMixedResultPresentation(): Record<string, unknown> {
+      const goodId = 'urn:uuid:11111111-1111-1111-1111-111111111111';
+      const badId = 'urn:uuid:22222222-2222-2222-2222-222222222222';
+      const good = CredentialFactory({ credential: { id: goodId } });
+      const bad = CredentialFactory({ credential: { id: badId } });
+      delete (bad as { proof?: unknown }).proof;
+      return PresentationFactory({ verifiableCredential: [good, bad] });
+    }
+
+    it('reports overall verified=false with 1 of 2 credentials verified', async () => {
+      const presentation = buildMixedResultPresentation();
+      const result = await verifyPresentation({ presentation, ...cryptoOnly });
+
+      expect(result.verified).to.be.false;
+      expect(result.credentialResults).to.have.lengthOf(2);
+      expect(result.credentialResults.filter(c => c.verified)).to.have.lengthOf(1);
+    });
+
+    it('VP-level summary entries are all green when the VP envelope is fine', async () => {
+      const presentation = buildMixedResultPresentation();
+      const result = await verifyPresentation({ presentation, ...cryptoOnly });
+
+      expect(result.summary.length).to.be.greaterThan(0);
+      expect(result.summary.every(s => s.verified)).to.be.true;
+    });
+
+    it('passing credential summary is all green; failing credential surfaces a failure entry', async () => {
+      const presentation = buildMixedResultPresentation();
+      const result = await verifyPresentation({ presentation, ...cryptoOnly });
+
+      const passing = result.credentialResults.find(c => c.verified);
+      const failing = result.credentialResults.find(c => !c.verified);
+      expect(passing).to.exist;
+      expect(failing).to.exist;
+
+      expect(passing!.summary.every(s => s.verified)).to.be.true;
+      expect(passing!.results).to.deep.equal([]);
+
+      const failureSummaries = failing!.summary.filter(s => !s.verified);
+      expect(failureSummaries.length).to.be.greaterThan(0);
+      expect(failing!.results.length).to.be.greaterThan(0);
+      expect(
+        failing!.results.every(r => r.outcome.status === 'failure'),
+      ).to.be.true;
+    });
+
+    it('failure detail rows can be located by id prefix from a failing summary entry', async () => {
+      const presentation = buildMixedResultPresentation();
+      const result = await verifyPresentation({ presentation, ...cryptoOnly });
+
+      const failing = result.credentialResults.find(c => !c.verified)!;
+      const failingSummary = failing.summary.find(s => !s.verified)!;
+      const detail = failing.results.filter(r =>
+        r.id?.startsWith(failingSummary.id + '.'),
+      );
+      expect(detail.length).to.be.greaterThan(0);
+      expect(detail.every(r => r.outcome.status === 'failure')).to.be.true;
+    });
+
+    it('verbose mode preserves all checks; summary[] identical to folded mode', async () => {
+      const presentation = buildMixedResultPresentation();
+      const folded = await verifyPresentation({ presentation, ...cryptoOnly });
+      const verbose = await verifyPresentation({
+        presentation,
+        ...cryptoOnly,
+        verbose: true,
+      });
+
+      expect(verbose.verified).to.equal(folded.verified);
+      expect(verbose.summary.map(s => s.id)).to.deep.equal(
+        folded.summary.map(s => s.id),
+      );
+      expect(verbose.summary.map(s => s.status)).to.deep.equal(
+        folded.summary.map(s => s.status),
+      );
+
+      for (let i = 0; i < verbose.credentialResults.length; i++) {
+        const v = verbose.credentialResults[i];
+        const f = folded.credentialResults[i];
+        expect(v.summary.map(s => s.id)).to.deep.equal(f.summary.map(s => s.id));
+        expect(v.summary.map(s => s.status)).to.deep.equal(
+          f.summary.map(s => s.status),
+        );
+        expect(v.results.length).to.be.greaterThanOrEqual(f.results.length);
       }
     });
   });

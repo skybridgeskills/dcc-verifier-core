@@ -27,6 +27,7 @@ export type {
 // ==================== Core Types ====================
 
 export type { CheckResult, CheckOutcome, VerificationCheck, VerificationSuite, VerificationSubjectType, SuitePhase } from './types/check.js';
+export type { SuiteSummary, SuiteSummaryPhase } from './types/suite-summary.js';
 export type { ProblemDetail } from './types/problem-detail.js';
 export type { VerificationContext, DocumentLoader, FetchJson } from './types/context.js';
 export type { HttpGetResult } from './types/http.js';
@@ -75,3 +76,5 @@ export {
   flattenPresentationResults,
 } from './flatten-presentation-results.js';
 export type { FlattenedCheckResult } from './flatten-presentation-results.js';
+export { foldCheckResults, computeId } from './fold-results.js';
+export type { FoldOptions } from './fold-results.js';

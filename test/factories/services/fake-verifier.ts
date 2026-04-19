@@ -29,6 +29,7 @@ const defaultVerifyCredential: Verifier['verifyCredential'] = async () =>
     verified: true,
     verifiableCredential: {} as VerifiableCredential,
     results: [],
+    summary: [],
   }) satisfies CredentialVerificationResult;
 
 const defaultVerifyPresentation: Verifier['verifyPresentation'] = async () =>
@@ -37,4 +38,5 @@ const defaultVerifyPresentation: Verifier['verifyPresentation'] = async () =>
     verifiablePresentation: {} as VerifiablePresentation,
     presentationResults: [],
     credentialResults: [],
+    summary: [],
   }) satisfies PresentationVerificationResult;

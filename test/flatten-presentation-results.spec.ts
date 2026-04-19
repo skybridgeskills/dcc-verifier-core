@@ -28,6 +28,7 @@ describe('flattenPresentationResults', () => {
       } as VerifiablePresentation,
       presentationResults,
       credentialResults: [],
+      summary: [],
     };
 
     const flat = flattenPresentationResults(result);
@@ -43,16 +44,19 @@ describe('flattenPresentationResults', () => {
       verified: true,
       verifiableCredential: stubVc,
       results: [mkCheck('core', 'c0-0'), mkCheck('core', 'c0-1')],
+      summary: [],
     };
     const c1: CredentialVerificationResult = {
       verified: true,
       verifiableCredential: stubVc,
       results: [mkCheck('core', 'c1-0'), mkCheck('status', 'c1-1'), mkCheck('core', 'c1-2')],
+      summary: [],
     };
     const c2: CredentialVerificationResult = {
       verified: true,
       verifiableCredential: stubVc,
       results: [mkCheck('registry', 'c2-0')],
+      summary: [],
     };
     const presentationResults = [mkCheck('proof', 'vp-0')];
     const result: PresentationVerificationResult = {
@@ -60,6 +64,7 @@ describe('flattenPresentationResults', () => {
       verifiablePresentation: {} as VerifiablePresentation,
       presentationResults,
       credentialResults: [c0, c1, c2],
+      summary: [],
     };
 
     const flat = flattenPresentationResults(result);
@@ -100,18 +105,22 @@ describe('flattenPresentationResults', () => {
           verified: true,
           verifiableCredential: stubVc,
           results: [mkCheck('a', '0-0'), mkCheck('a', '0-1')],
+          summary: [],
         },
         {
           verified: true,
           verifiableCredential: stubVc,
           results: [mkCheck('b', '1-0')],
+          summary: [],
         },
         {
           verified: true,
           verifiableCredential: stubVc,
           results: [mkCheck('c', '2-0'), mkCheck('c', '2-1'), mkCheck('c', '2-2')],
+          summary: [],
         },
       ],
+      summary: [],
     };
 
     const flat = flattenPresentationResults(result);

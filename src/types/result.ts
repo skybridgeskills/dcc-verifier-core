@@ -1,4 +1,5 @@
 import { CheckResult } from './check.js';
+import { SuiteSummary } from './suite-summary.js';
 import { VerifiableCredential } from '../schemas/credential.js';
 import { VerifiablePresentation } from '../schemas/presentation.js';
 
@@ -40,8 +41,24 @@ export interface CredentialVerificationResult {
    */
   recognizedProfile?: string;
 
-  /** Flat array of results from all suites — every check that ran or was skipped. */
+  /**
+   * Flat array of check results.
+   *
+   * In the default (`verbose: false`) mode this carries only
+   * failures and explicitly-emitted skips — successes are folded
+   * away into the per-suite rollup on {@link summary}. Pass
+   * `verbose: true` on `VerifierConfig` (or per-call) to receive
+   * every check that ran.
+   */
   results: CheckResult[];
+
+  /**
+   * Per-suite rollup of every (phase, suite) that ran. Always
+   * populated regardless of `verbose`. Primary surface for UI
+   * rendering; lazy-expand into {@link results} for failure
+   * detail. See {@link SuiteSummary}.
+   */
+  summary: SuiteSummary[];
 
   /**
    * `true` when this result was produced under a non-default
@@ -71,11 +88,23 @@ export interface PresentationVerificationResult {
    */
   verifiablePresentation: VerifiablePresentation;
 
-  /** Check results from presentation-level verification (VP signature). */
+  /**
+   * Check results from presentation-level verification (VP
+   * signature). Honors the `verbose` flag the same way
+   * {@link CredentialVerificationResult.results} does.
+   */
   presentationResults: CheckResult[];
 
   /** Individual credential verification results, one per embedded VC. */
   credentialResults: CredentialVerificationResult[];
+
+  /**
+   * Per-suite rollup of presentation-level checks (i.e. the
+   * suites that produced {@link presentationResults}). Per-credential
+   * rollups live on each {@link credentialResults} entry's own
+   * `summary`. Always populated regardless of `verbose`.
+   */
+  summary: SuiteSummary[];
 
   /**
    * `true` when this result was produced under a non-default

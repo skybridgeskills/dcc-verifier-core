@@ -86,6 +86,9 @@ describe('Verifier cache sharing', () => {
       cacheService: InMemoryCacheService(),
       cryptoServices: [FakeCryptoService({ verified: true })],
       registries: [dccLegacyRegistry],
+      // Verbose so the registry success surfaces in `results[]` for
+      // the sanity assertion below; folded mode would hide it.
+      verbose: true,
     });
 
     const first = await verifier.verifyCredential({

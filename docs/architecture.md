@@ -535,6 +535,7 @@ recognition VC issued by a trust authority.
   verified: boolean;
   verifiableCredential: VerifiableCredential;
   results: CheckResult[];
+  summary: SuiteSummary[];                   // per-suite rollup (since v2.0.0)
   normalizedVerifiableCredential?: unknown;  // populated when a recognizer matched
   recognizedProfile?: string;                // recognizer id (e.g. 'obv3p0.openbadge')
   partial?: boolean;                         // true when caller passed `phases:`
@@ -549,9 +550,26 @@ recognition VC issued by a trust authority.
   verifiablePresentation: VerifiablePresentation;
   presentationResults: CheckResult[];
   credentialResults: CredentialVerificationResult[];
+  summary: SuiteSummary[];
   partial?: boolean;
 }
 ```
+
+### Result folding
+
+Since v2.0.0, `results[]` (on both result types, and on each embedded
+`credentialResults[i]`) carries only failures and explicit
+`<suite>.applies` skips by default; the per-suite rollup lives in
+`summary[]`. Pass `verbose: true` (on the verifier or per call) to
+restore the legacy "every check" shape on `results[]`. The folding
+itself is implemented as a pure helper — `foldCheckResults` /
+`computeId` in `src/fold-results.ts` — and is also exported from the
+package barrel for consumers that append late results and want to
+re-fold.
+
+See [`docs/api/verification-results.md`](api/verification-results.md)
+for the full reference, including the `id` namespace, rendering
+recipes, and the LLM prompt appendix for downstream UIs.
 
 Both shapes use the suite-based `CheckResult[]` model. Each `CheckResult` carries a discriminated
 `CheckOutcome` (`success | failure | skipped`) plus provenance (suite, check id, fatal flag,

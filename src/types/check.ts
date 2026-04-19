@@ -39,10 +39,35 @@ export type CheckOutcome =
  * primary report structure returned by `verifyCredential`.
  */
 export interface CheckResult {
-  /** Qualified check id, e.g. `"core.proof-exists"`. */
+  /**
+   * Dot-separated namespaced id — `<phase>.<suite>.<localPart>`
+   * (e.g. `"cryptographic.proof.signature"`). When `phase === suite`
+   * the duplicate segment collapses (e.g. `"recognition.profile"`).
+   *
+   * Computed by the verifier post-`runSuites`. Prefer this over the
+   * legacy `check` / `suite` pair when consuming results.
+   *
+   * Optional today for backwards compatibility with hand-constructed
+   * `CheckResult` literals; will become required in a future major.
+   */
+  id?: string;
+
+  /**
+   * @deprecated Use {@link CheckResult.id}. Will be removed in the
+   * major release after the one that introduced `id`.
+   *
+   * Qualified check id, e.g. `"core.proof-exists"`.
+   */
   check: string;
-  /** Suite id this check belongs to, e.g. `"core"`. */
+
+  /**
+   * @deprecated Use {@link CheckResult.id}. Will be removed in the
+   * major release after the one that introduced `id`.
+   *
+   * Suite id this check belongs to, e.g. `"core"`.
+   */
   suite: string;
+
   outcome: CheckOutcome;
   /** ISO 8601 timestamp when the check was executed. */
   timestamp: string;
