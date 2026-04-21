@@ -11,6 +11,24 @@ import type { ProblemDetail } from '../types/problem-detail.js';
 import type { VerificationSubject } from '../types/subject.js';
 import { ProblemTypes } from '../problem-types.js';
 
+/**
+ * No-op `checkStatus` passed to `@digitalcredentials/vc` so its
+ * `_verifyCredential` doesn't throw `TypeError` when a VC carries
+ * `credentialStatus`. The library requires a callable `checkStatus`
+ * for any VC with `credentialStatus`; this no-op satisfies that
+ * required signature without performing any real status work.
+ *
+ * Real status verification is owned by `statusSuite`
+ * (`src/suites/status/bitstring-status-check.ts`). See plan
+ * `docs/plans/2026-04-19-route-via-http-and-dedupe-status-check/`
+ * for the rationale (P-E: status is owned solely by the status
+ * suite, no double-check from the proof path).
+ */
+const noopCheckStatus = async (): Promise<{ verified: true; results: [] }> => ({
+  verified: true,
+  results: [],
+});
+
 const { purposes } = jsonLdSignatures;
 
 const HTTP_ERROR = 'HTTPError';
@@ -177,6 +195,7 @@ export function DataIntegrityCryptoService(config: DataIntegrityCryptoConfig): C
           suite: suites,
           documentLoader: options.documentLoader,
           verifyMatchingIssuers: false,
+          checkStatus: noopCheckStatus,
         });
 
         const verified = result.verified ?? false;
@@ -218,6 +237,7 @@ export function DataIntegrityCryptoService(config: DataIntegrityCryptoConfig): C
           unsignedPresentation: options.unsignedPresentation ?? false,
           challenge: options.challenge ?? 'meaningless',
           verifyMatchingIssuers: false,
+          checkStatus: noopCheckStatus,
         });
 
         const verified = result.verified ?? false;

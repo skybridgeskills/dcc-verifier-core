@@ -1,9 +1,17 @@
 import { expect } from 'chai';
 import { verifyPresentation } from '../src/index.js';
+import {
+  defaultCryptoServices,
+  defaultDocumentLoaderFor,
+  defaultHttpGetService,
+} from '../src/default-services.js';
+import { createVerifier } from '../src/verifier.js';
 import { flattenPresentationResults } from '../src/flatten-presentation-results.js';
 import { CredentialFactory } from './factories/data/credential-factory.js';
 import { PresentationFactory } from './factories/data/presentation-factory.js';
 import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
+import { FakeDocumentLoader } from './factories/services/fake-document-loader.js';
+import { v2WithValidStatus } from './fixtures/v2-with-valid-status.js';
 
 // Existing tests in this file inspect every check in
 // `result.results` / `result.presentationResults`. Use a verbose
@@ -461,6 +469,88 @@ describe('verifyPresentation', () => {
         );
         expect(v.results.length).to.be.greaterThanOrEqual(f.results.length);
       }
+    });
+  });
+
+  describe('VP with revocable embedded VC — Phase B proof/status decoupling', () => {
+    const STATUS_LIST_URL =
+      'https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5WK8CbZ1GjycuPombrj';
+
+    /** Same object as `verify-credential.spec.ts` Phase B block — parsed list VC for `v2WithValidStatus`. */
+    const statusListE5Fixture = {
+      '@context': [
+        'https://www.w3.org/ns/credentials/v2',
+        'https://w3id.org/security/suites/ed25519-2020/v1',
+      ],
+      id: 'https://testing.dcconsortium.org/status/e5WK8CbZ1GjycuPombrj',
+      type: ['VerifiableCredential', 'BitstringStatusListCredential'],
+      credentialSubject: {
+        id: 'https://testing.dcconsortium.org/status/e5WK8CbZ1GjycuPombrj#list',
+        type: 'BitstringStatusList',
+        encodedList:
+          'uH4sIAAAAAAAAA-3BMQEAAAwCoGUx6aLbwgvIHwAAAAAAAAAAAAAAwFwBZnztF9QwAAA',
+        statusPurpose: 'revocation',
+      },
+      issuer: 'did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q',
+      validFrom: '2025-01-09T15:20:02.183Z',
+      proof: {
+        type: 'Ed25519Signature2020',
+        created: '2025-01-09T15:20:02Z',
+        verificationMethod:
+          'did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q',
+        proofPurpose: 'assertionMethod',
+        proofValue:
+          'z4WFodWdHXGieqNtWYK2448A7qZdhMkxyqjVuMqifdanFYXXAqPT8xatjncxjDsXT6fskz8pC8TLBmEhnd7BC7Tqb',
+      },
+    };
+
+    it('VP proof rollup succeeds; embedded VC proof + status succeed; no checkStatus TypeError in tree', async function () {
+      this.timeout(90000);
+      const presentation = PresentationFactory({
+        verifiableCredential: [v2WithValidStatus],
+      });
+      const documentLoader = FakeDocumentLoader(
+        { [STATUS_LIST_URL]: statusListE5Fixture },
+        { fallback: defaultDocumentLoaderFor(defaultHttpGetService()) },
+      );
+      const verifier = createVerifier({
+        verbose: true,
+        documentLoader,
+        cryptoServices: [
+          FakeCryptoService({
+            canVerify: subject => subject.verifiablePresentation != null,
+          }),
+          ...defaultCryptoServices(),
+        ],
+      });
+
+      const result = await verifier.verifyPresentation({
+        presentation,
+        challenge: 'factory-challenge',
+      });
+
+      expect(result.verified).to.be.true;
+      expect(JSON.stringify(result)).to.not.include('checkStatus');
+
+      const presProofSummary = result.summary.find(s => s.id === 'cryptographic.proof');
+      expect(presProofSummary?.status).to.equal('success');
+
+      const presSig = result.presentationResults.find(r => r.check === 'proof.signature');
+      expect(presSig?.outcome.status).to.equal('success');
+
+      expect(result.credentialResults).to.have.lengthOf(1);
+      expect(result.credentialResults[0].verified).to.be.true;
+
+      const credSummary = result.credentialResults[0].summary;
+      const credProof = credSummary.find(s => s.id === 'cryptographic.proof');
+      const credStatus = credSummary.find(s => s.id === 'cryptographic.status');
+      expect(credProof?.status).to.equal('success');
+      expect(credStatus?.status).to.equal('success');
+
+      const credSig = result.credentialResults[0].results.find(
+        r => r.check === 'proof.signature',
+      );
+      expect(credSig?.outcome.status).to.equal('success');
     });
   });
 });

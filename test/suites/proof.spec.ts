@@ -1,11 +1,14 @@
 import { expect } from 'chai';
 import { runSuites } from '../../src/run-suites.js';
+import { defaultCryptoServices } from '../../src/default-services.js';
 import { proofSuite } from '../../src/suites/proof/index.js';
+import { signatureCheck } from '../../src/suites/proof/signature-check.js';
 import { buildTestContext } from '../factories/services/build-test-context.js';
 import { VerificationSubject } from '../../src/types/subject.js';
 import { CredentialFactory } from '../factories/data/credential-factory.js';
 import { PresentationFactory } from '../factories/data/presentation-factory.js';
 import { FakeCryptoService } from '../factories/services/fake-crypto-service.js';
+import { v2WithValidStatus } from '../fixtures/v2-with-valid-status.js';
 
 function subjectHasLinkedDataProof(subject: VerificationSubject): boolean {
   const doc = subject.verifiablePresentation ?? subject.verifiableCredential;
@@ -213,6 +216,19 @@ describe('Proof Verification Suite', () => {
       if (results[0].outcome.status === 'failure') {
         expect(results[0].outcome.problems[0].title).to.equal('No Applicable Crypto Service');
       }
+    });
+  });
+
+  describe('signatureCheck', () => {
+    it('succeeds for a VC with credentialStatus (real crypto; vc lib checkStatus requirement satisfied)', async function () {
+      this.timeout(60000);
+      const ctx = buildTestContext({ cryptoServices: defaultCryptoServices() });
+      const outcome = await signatureCheck.execute(
+        { verifiableCredential: v2WithValidStatus },
+        ctx,
+      );
+      expect(outcome.status).to.equal('success');
+      expect(JSON.stringify(outcome)).to.not.include('checkStatus');
     });
   });
 });

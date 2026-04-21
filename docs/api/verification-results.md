@@ -6,7 +6,7 @@
 > escape hatch, and a UI rendering recipe.
 >
 > **Audience.** UI/integration teams building on top of `verifier-core`,
-> primarily `dcc-transaction-service`. The §8 prompt-ready appendix is
+> primarily `dcc-transaction-service`. The §9 prompt-ready appendix is
 > written to be copy-pasted as the seed of an LLM prompt.
 >
 > **See also.** For per-check / per-suite / per-call timing data
@@ -15,13 +15,14 @@
 ## Table of Contents
 
 1. [Overview — folded vs verbose](#overview)
-2. [Phase model](#phase-model)
-3. [`SuiteSummary` reference](#suitesummary-reference)
-4. [`id` namespace reference](#id-namespace-reference)
-5. [UI rendering recipe](#ui-rendering-recipe)
-6. [Verbose mode](#verbose-mode)
-7. [Backwards compatibility](#backwards-compatibility)
-8. [Prompt-ready appendix](#prompt-ready-appendix)
+2. [Presentation vs credential scopes](#presentation-vs-credential-scopes)
+3. [Phase model](#phase-model)
+4. [`SuiteSummary` reference](#suitesummary-reference)
+5. [`id` namespace reference](#id-namespace-reference)
+6. [UI rendering recipe](#ui-rendering-recipe)
+7. [Verbose mode](#verbose-mode)
+8. [Backwards compatibility](#backwards-compatibility)
+9. [Prompt-ready appendix](#prompt-ready-appendix)
 
 ## Overview
 
@@ -81,6 +82,71 @@ The same verification with `verbose: true`:
 }
 ```
 
+## Presentation vs credential scopes
+
+`verifyPresentation` returns **both** a `presentationResults` array and a
+`credentialResults` array. `presentationResults` holds **VP-level**
+checks (the presentation envelope’s proof/signature and any suite whose
+`applies` accepts a `verifiablePresentation`). `credentialResults` has
+**one entry per embedded verifiable credential**, each with its own
+`results` and `summary` for per-credential phases (structural/core,
+recognition, per-credential proof and status, registry, and other
+VC-scoped suites).
+
+A `verifyPresentation(...)` result carries **two distinct scopes** of
+verification, plus a derived top-level verdict. Knowing where to look
+for what makes the difference between "the presentation envelope was
+tampered with" and "one of the embedded credentials was revoked".
+
+| Scope | Lives on | Suites that contribute | How `verified` aggregates |
+|-------|----------|------------------------|---------------------------|
+| Presentation-only | `result.presentationResults`, `result.summary` | `proofSuite` (run **once** against the VP envelope itself) plus any `additionalSuites` whose `applies` accepts a `verifiablePresentation` subject | — (see top-level row) |
+| Per credential | `result.credentialResults[i].results`, `result.credentialResults[i].summary` | `core`, `recognition`, `proof`, `status`, `registry` (defaults) plus any `additionalSuites` whose `applies` accepts the VC subject | `credentialResults[i].verified === no fatal failures across the per-credential checks` |
+| Top-level | `result.verified` | derived | `presentationResults` has no fatal failures **AND** every `credentialResults[i].verified` is true |
+
+When verifying a VP, `cryptographic.proof.signature` runs once at the VP
+level (against the VP’s own proof) and once per embedded VC (against each
+VC’s proof). Consumers **must** distinguish these by where the result
+appears — `presentationResults` vs the matching
+`credentialResults[i].results` — not by the check id alone.
+
+### The two `cryptographic.proof.signature` checks
+
+The same check id, `cryptographic.proof.signature`, can appear in
+**both** `presentationResults` and `credentialResults[i].results` — and
+they verify **different artifacts**:
+
+- In `presentationResults`: the **holder's** signature on the VP
+  envelope (typically `proofPurpose: 'authentication'`).
+- In `credentialResults[i].results`: the **issuer's** signature on
+  embedded VC `i` (typically `proofPurpose: 'assertionMethod'`).
+
+A failure in one does not imply a failure in the other. A VP with a
+broken holder signature can still contain perfectly valid VCs; a VP
+with a valid holder signature can still contain a credential whose
+issuer's signature is invalid.
+
+### One iterable view: `flattenPresentationResults`
+
+When you want a single flat array of every check that ran — VP-level
+plus all embedded-VC-level — use `flattenPresentationResults(result)`.
+It is re-exported from the package barrel (`src/index.ts`). It returns a
+`FlattenedCheckResult[]` where each entry tags scope provenance via a
+`source` field (`'presentation'` vs `'credential'`, with `credentialIndex`
+when the row comes from an embedded credential):
+
+```ts
+type FlattenedCheckResult =
+  | { source: 'presentation'; result: CheckResult }
+  | { source: 'credential'; credentialIndex: number; result: CheckResult };
+```
+
+Reach for `flattenPresentationResults` when you don't care about scope
+(e.g., a debug dump of every problem). Stick with the structured
+`presentationResults` / `credentialResults[i].results` split for any
+UI that needs to attribute failures to either the VP or a specific
+embedded credential.
+
 ## Phase model
 
 Every built-in suite carries a `phase` tag from
@@ -97,7 +163,7 @@ Suites without a `phase` tag are reported as `'unknown'` on
 | `unknown` | — | any caller-supplied suite without a `phase` tag |
 
 The phase is the natural top-level grouping for a UI. See
-[§5 UI rendering recipe](#ui-rendering-recipe). For two-pass
+[§6 UI rendering recipe](#ui-rendering-recipe). For two-pass
 verification (running only a subset of phases), see the README's
 [Credential recognition + two-pass verification](../../README.md#advanced-credential-recognition--two-pass-verification).
 
@@ -220,7 +286,7 @@ Two consequences worth remembering when consuming:
 
 - **A failing summary's children always start with `summary.id + '.'`.**
   Filter `cr.results` with that prefix to find the failure detail rows
-  for a given summary entry. (See §5 step 3.)
+  for a given summary entry. (See §6 step 3.)
 - **Suite ids do not need to match phases.** The OB suites all live
   under phase `'semantic'`, but their checks still carry their
   authored ids (e.g. `schema.obv3.result-ref`), so the resulting ids
@@ -342,7 +408,7 @@ When _not_ to use it:
   `suite`:**
   - Easiest: pass `verbose: true` and keep your existing assertions.
   - Cleanest: switch to `id` and prefix-matching against the summary
-    rollup. See §5 step 3 for the canonical pattern.
+    rollup. See §6 step 3 for the canonical pattern.
 
 ## Prompt-ready appendix
 

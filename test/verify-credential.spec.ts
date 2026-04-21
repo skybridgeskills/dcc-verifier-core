@@ -1,5 +1,10 @@
 import { expect } from 'chai';
 import { verifyCredential } from '../src/index.js';
+import {
+  defaultDocumentLoaderFor,
+  defaultHttpGetService,
+} from '../src/default-services.js';
+import { createVerifier } from '../src/verifier.js';
 import { openBadgesSchemaSuite } from '../src/openbadges/index.js';
 import { runSuites } from '../src/run-suites.js';
 import { defaultSuites } from '../src/default-suites.js';
@@ -15,6 +20,7 @@ import { FakeCryptoService } from './factories/services/fake-crypto-service.js';
 import { FakeDocumentLoader } from './factories/services/fake-document-loader.js';
 import { v1Expired } from './fixtures/v1-expired.js';
 import { v2Expired } from './fixtures/v2-expired.js';
+import { v2WithValidStatus } from './fixtures/v2-with-valid-status.js';
 
 // ests in this file ensure spec completion by inspecting every check in
 // `result.results`. Use a verbose verifier to enable these checks; folded-mode
@@ -461,6 +467,67 @@ describe('verifyCredential', () => {
       expect(result.summary[0].status).to.equal('failure');
       expect(result.results).to.have.lengthOf(1);
       expect(result.results[0].id).to.equal('cryptographic.parsing.envelope');
+    });
+  });
+
+  describe('revocable VC — Phase B proof/status decoupling (createVerifier)', () => {
+    const STATUS_LIST_URL =
+      'https://raw.githubusercontent.com/digitalcredentials/verifier-core/refs/heads/main/src/test-fixtures/status/e5WK8CbZ1GjycuPombrj';
+
+    /**
+     * Same status list VC as the hosted `v2WithValidStatus` fixture references,
+     * as a parsed object. Serving it via {@link FakeDocumentLoader} avoids
+     * GitHub raw `text/plain` bodies (unparsed JSON string) breaking the
+     * bitstring status path in CI.
+     */
+    const statusListE5Fixture = {
+      '@context': [
+        'https://www.w3.org/ns/credentials/v2',
+        'https://w3id.org/security/suites/ed25519-2020/v1',
+      ],
+      id: 'https://testing.dcconsortium.org/status/e5WK8CbZ1GjycuPombrj',
+      type: ['VerifiableCredential', 'BitstringStatusListCredential'],
+      credentialSubject: {
+        id: 'https://testing.dcconsortium.org/status/e5WK8CbZ1GjycuPombrj#list',
+        type: 'BitstringStatusList',
+        encodedList:
+          'uH4sIAAAAAAAAA-3BMQEAAAwCoGUx6aLbwgvIHwAAAAAAAAAAAAAAwFwBZnztF9QwAAA',
+        statusPurpose: 'revocation',
+      },
+      issuer: 'did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q',
+      validFrom: '2025-01-09T15:20:02.183Z',
+      proof: {
+        type: 'Ed25519Signature2020',
+        created: '2025-01-09T15:20:02Z',
+        verificationMethod:
+          'did:key:z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q#z6MknNQD1WHLGGraFi6zcbGevuAgkVfdyCdtZnQTGWVVvR5Q',
+        proofPurpose: 'assertionMethod',
+        proofValue:
+          'z4WFodWdHXGieqNtWYK2448A7qZdhMkxyqjVuMqifdanFYXXAqPT8xatjncxjDsXT6fskz8pC8TLBmEhnd7BC7Tqb',
+      },
+    };
+
+    it('end-to-end: BitstringStatusListEntry VC completes proof + status suites without checkStatus TypeError', async function () {
+      this.timeout(60000);
+      const documentLoader = FakeDocumentLoader(
+        { [STATUS_LIST_URL]: statusListE5Fixture },
+        { fallback: defaultDocumentLoaderFor(defaultHttpGetService()) },
+      );
+      const verifier = createVerifier({ verbose: true, documentLoader });
+      const result = await verifier.verifyCredential({
+        credential: v2WithValidStatus,
+      });
+
+      expect(result.verified).to.be.true;
+      expect(JSON.stringify(result)).to.not.include('checkStatus');
+
+      const proofSummary = result.summary.find(s => s.id === 'cryptographic.proof');
+      const statusSummary = result.summary.find(s => s.id === 'cryptographic.status');
+      expect(proofSummary?.status).to.equal('success');
+      expect(statusSummary?.status).to.equal('success');
+
+      const sigCheck = result.results.find(r => r.check === 'proof.signature');
+      expect(sigCheck?.outcome.status).to.equal('success');
     });
   });
 });
