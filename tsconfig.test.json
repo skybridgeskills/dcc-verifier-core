@@ -12,7 +12,10 @@
     "baseUrl": ".",
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@digitalcredentials/vc": ["src/types/@digitalcredentials/vc.d.ts"]
+    }
   },
   "ts-node": {
     "files": true

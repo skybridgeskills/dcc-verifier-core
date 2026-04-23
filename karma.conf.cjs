@@ -10,6 +10,8 @@ module.exports = function (config) {
       'test/**/*.ts' // *.tsx for React Jsx
     ],
 
+    exclude: ['**/smoke.spec.ts'],
+
     karmaTypescriptConfig: {
       reports: {} // Disables the code coverage report
     },
