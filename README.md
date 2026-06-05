@@ -846,7 +846,7 @@ git clone https://github.com/digitalcredentials/verifier-core.git
 cd verifier-core
 pnpm install
 pnpm test            # lint + node tests (vitest)
-pnpm run test-browser # playwright (run `pnpm exec playwright install chromium` first)
+pnpm run test:browser # playwright (run `pnpm exec playwright install chromium` first)
 ```
 
 ## Contribute
