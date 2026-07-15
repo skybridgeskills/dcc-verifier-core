@@ -2,6 +2,7 @@ import { securityLoader } from '@digitalcredentials/security-document-loader';
 import { CachedResolver } from '@digitalcredentials/did-io';
 import * as didKey from '@digitalcredentials/did-method-key';
 import * as Ed25519Multikey from '@digitalcredentials/ed25519-multikey';
+import * as EcdsaMultikey from '@interop/ecdsa-multikey';
 import type { DocumentLoader } from '../types/context.js';
 import type { HttpGetService } from '../services/http-get-service/http-get-service.js';
 import { didWebDriverWithHttpGet } from './did-web-driver-with-http-get.js';
@@ -31,6 +32,21 @@ export function documentLoaderFromHttpGet(
     multibaseMultikeyHeader: 'z6Mk',
     fromMultibase: Ed25519Multikey.from
   });
+  // ECDSA Multikey: P-256 (zDna) and P-384 (z82L) for ecdsa-rdfc-2019.
+  // `@interop/ecdsa-multikey` ships strict types whose `from` parameter is
+  // narrower than the driver's `(input: unknown) => unknown` contract; bind
+  // once to that contract (runtime accepts the serialized multikey object).
+  const ecdsaFromMultibase = EcdsaMultikey.from as (input: unknown) => unknown;
+  for (const header of ['zDna', 'z82L'] as const) {
+    didKeyDriver.use({
+      multibaseMultikeyHeader: header,
+      fromMultibase: ecdsaFromMultibase
+    });
+    didWebDriver.use({
+      multibaseMultikeyHeader: header,
+      fromMultibase: ecdsaFromMultibase
+    });
+  }
   loader.setDidResolver(resolver);
 
   const handler = {

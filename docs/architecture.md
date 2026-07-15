@@ -620,6 +620,8 @@ their own URIs without requiring an entry in any catalog.
 | `@digitalcredentials/jsonld-signatures`              | Linked Data Proof verification and proof purposes                    |
 | `@digitalcredentials/ed25519-signature-2020`         | Ed25519Signature2020 crypto suite                                    |
 | `@digitalcredentials/eddsa-rdfc-2022-cryptosuite`    | EdDSA/RDFC 2022 Data Integrity crypto suite                          |
+| `@interop/ecdsa-signature`                           | ECDSA/RDFC 2019 Data Integrity crypto suite (P-256/P-384 Multikey)   |
+| `@interop/ecdsa-multikey`                            | ECDSA Multikey `from` handler for did:key/did:web ECDSA verification methods |
 | `@digitalcredentials/data-integrity`                 | DataIntegrityProof wrapper                                           |
 | `@digitalcredentials/security-document-loader`       | Bundled JSON-LD context resolution + `CachedResolver`                |
 | `@digitalcredentials/did-method-key`, `did-method-web` | DID resolution drivers used by the document loader                  |

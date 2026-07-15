@@ -11,6 +11,7 @@ import { v1NoStatus } from './fixtures/v1-no-status.js';
 import { v2NoStatus } from './fixtures/v2-no-status.js';
 import { v2WithValidStatus } from './fixtures/v2-with-valid-status.js';
 import { v2EddsaWithValidStatus } from './fixtures/v2-eddsa-with-valid-status.js';
+import { v2EcdsaNoStatus } from './fixtures/v2-ecdsa-no-status.js';
 import { v2didWebWithValidStatus } from './fixtures/v2-did-web-with-valid-status.js';
 import { v2DoubleSigWithValidStatus } from './fixtures/v2-double-sig-with-valid-status.js';
 
@@ -34,6 +35,11 @@ describe('smoke (golden credentials, real crypto + loader)', () => {
     const result = await verifyCredential({
       credential: v2EddsaWithValidStatus
     });
+    expect(result.verified).toBe(true);
+  });
+
+  it('v2EcdsaNoStatus — ECDSA RDFC-2019 Data Integrity / P-256 did:key', async () => {
+    const result = await verifyCredential({ credential: v2EcdsaNoStatus });
     expect(result.verified).toBe(true);
   });
 

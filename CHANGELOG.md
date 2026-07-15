@@ -9,6 +9,11 @@ Verifier results now fold per-suite checks into a single
 
 ### Added
 
+- Default verification support for the `ecdsa-rdfc-2019` Data Integrity
+  cryptosuite (Multikey; P-256 `zDna…` and P-384 `z82L…` did:key/did:web
+  verification methods), wired via `@interop/ecdsa-signature` +
+  `@interop/ecdsa-multikey`. `defaultCryptoSuites()` now registers three suites:
+  Ed25519Signature2020, EdDSA RDFC-2022, and ECDSA RDFC-2019.
 - `SuiteSummary` type and `summary: SuiteSummary[]` field on
   `CredentialVerificationResult` and `PresentationVerificationResult`.
 - `id: string` field on `CheckResult` — dot-separated
