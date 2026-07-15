@@ -26,6 +26,7 @@
 import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';
 import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
+import { ecdsaRdfc2019 } from '@interop/ecdsa-signature/ecdsa-rdfc-2019';
 import { BuiltinHttpGetService } from './services/http-get-service/builtin-http-get-service.js';
 import { InMemoryCacheService } from './services/cache-service/in-memory-cache-service.js';
 import { DataIntegrityCryptoService } from './services/data-integrity-crypto.js';
@@ -59,16 +60,19 @@ export function createDefaultCacheService(): CacheService {
 }
 
 /**
- * Default crypto suites: Ed25519Signature2020 + EdDSA/RDFC 2022.
+ * Default crypto suites: Ed25519Signature2020 + EdDSA/RDFC 2022 +
+ * ECDSA/RDFC 2019.
  *
- * Both are included because credentials in the wild use either the older
- * Linked Data Proof or the newer Data Integrity Proof.
+ * Three suites cover the proofs seen in the wild: the older Linked Data
+ * Proof (Ed25519-2020) and the newer Data Integrity Proofs (EdDSA
+ * RDFC-2022 and ECDSA RDFC-2019, the latter for P-256/P-384 Multikey).
  */
 export function defaultCryptoSuites(): CryptoSuite[] {
   if (!cachedCryptoSuites) {
     cachedCryptoSuites = [
       new Ed25519Signature2020(),
-      new DataIntegrityProof({ cryptosuite: eddsaRdfc2022CryptoSuite })
+      new DataIntegrityProof({ cryptosuite: eddsaRdfc2022CryptoSuite }),
+      new DataIntegrityProof({ cryptosuite: ecdsaRdfc2019 })
     ];
   }
   return cachedCryptoSuites;

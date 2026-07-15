@@ -31,11 +31,13 @@ Verifies the following versions of W3C Verifiable Credentials:
 - [1.1](https://www.w3.org/TR/2022/REC-vc-data-model-20220303/)
 - [2.0](https://www.w3.org/TR/vc-data-model-2.0/)
 
-Supports both
-[eddsa-rdfc-2022 Data Integrity Proof](https://github.com/digitalbazaar/eddsa-rdfc-2022-cryptosuite)
+Supports the
+[eddsa-rdfc-2022](https://github.com/digitalbazaar/eddsa-rdfc-2022-cryptosuite)
 and
+[ecdsa-rdfc-2019](https://www.w3.org/TR/vc-di-ecdsa/) (P-256/P-384 Multikey)
+Data Integrity Proof cryptosuites, and the
 [ed25519-signature-2020 Linked Data Proof](https://github.com/digitalbazaar/ed25519-signature-2020)
-cryptosuites.
+cryptosuite.
 
 Verification runs an ordered pipeline of **suites**, each containing one or more
 **checks**:
@@ -119,7 +121,8 @@ interface VerifyCredentialOptions {
 ```
 
 Only `credential` is required. All other fields override sensible defaults
-(security-document-loader, Ed25519 + EdDSA crypto suites, in-memory cache).
+(security-document-loader, Ed25519 + EdDSA + ECDSA crypto suites, in-memory
+cache).
 `VerifyCredentialOptions` is the type alias
 `VerifierConfig & VerifyCredentialCall`, so callers building the options object
 piece-by-piece can compose against either half.

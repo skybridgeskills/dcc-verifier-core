@@ -16,6 +16,7 @@
 import { Ed25519Signature2020 } from '@digitalcredentials/ed25519-signature-2020';
 import { DataIntegrityProof } from '@digitalcredentials/data-integrity';
 import { cryptosuite as eddsaRdfc2022CryptoSuite } from '@digitalcredentials/eddsa-rdfc-2022-cryptosuite';
+import { ecdsaRdfc2019 } from '@interop/ecdsa-signature/ecdsa-rdfc-2019';
 import { DataIntegrityCryptoService } from '../../../src/services/data-integrity-crypto.js';
 import { createRegistryLookup } from '../../../src/services/registry-lookup.js';
 import { BuiltinHttpGetService } from '../../../src/services/http-get-service/builtin-http-get-service.js';
@@ -28,9 +29,14 @@ import type { CryptoSuite } from '../../../src/types/crypto-suite.js';
 const eddsaSuite = new DataIntegrityProof({
   cryptosuite: eddsaRdfc2022CryptoSuite
 });
+const ecdsaSuite = new DataIntegrityProof({ cryptosuite: ecdsaRdfc2019 });
 const ed25519Suite = new Ed25519Signature2020();
 
-const defaultCryptoSuites: CryptoSuite[] = [ed25519Suite, eddsaSuite];
+const defaultCryptoSuites: CryptoSuite[] = [
+  ed25519Suite,
+  eddsaSuite,
+  ecdsaSuite
+];
 
 /** Build a {@link VerificationContext} for tests, optionally overridden. */
 export function buildTestContext(
