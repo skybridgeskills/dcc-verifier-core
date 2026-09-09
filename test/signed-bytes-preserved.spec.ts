@@ -8,13 +8,6 @@
  * `@digitalcredentials/security-document-loader`, so the signature is genuinely
  * checked without a network call — the `httpGetService` below throws if anything
  * reaches for one.
- *
- * The bug these lock down: `IssuerObjectSchema` typed `issuer.image` as a bare
- * `z.object({ id, type })`. Zod's `.passthrough()` does not extend into nested
- * object schemas, so `caption` — which Open Badges 3.0 §B.1.13 defines on
- * `Image` — was deleted before verification. That changed the canonicalized
- * N-Quads and the proof failed as `INVALID_SIGNATURE`, so real issuers whose
- * logo carried a caption could not be verified at all.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -182,8 +175,10 @@ describe('signed bytes survive verification', () => {
 });
 
 describe('parseCredential preserves signed fields', () => {
-  it('keeps unknown keys on issuer.image', () => {
+  it('keeps caption and unknown keys on issuer.image', () => {
     const credential = credentialTemplate('did:example:issuer');
+    (credential.issuer as { image: Record<string, unknown> }).image.foo =
+      'extension';
     const parsed = parseCredential(credential);
 
     expect(parsed.success).toBe(true);
@@ -192,8 +187,19 @@ describe('parseCredential preserves signed fields', () => {
     expect(issuer.image).toEqual({
       id: 'https://example.test/logo.png',
       type: 'Image',
-      caption: 'Example Corp logo'
+      caption: 'Example Corp logo',
+      foo: 'extension'
     });
+  });
+
+  it('does not rewrite issuer.image.type from a string into an array', () => {
+    const credential = credentialTemplate('did:example:issuer');
+    const parsed = parseCredential(credential);
+
+    expect(parsed.success).toBe(true);
+    const issuer = (parsed as { data: { issuer: Record<string, unknown> } })
+      .data.issuer;
+    expect((issuer.image as { type: unknown }).type).toBe('Image');
   });
 
   it('accepts an array-valued issuer.image.type', () => {
@@ -202,6 +208,10 @@ describe('parseCredential preserves signed fields', () => {
       'Image'
     ];
 
-    expect(parseCredential(credential).success).toBe(true);
+    const parsed = parseCredential(credential);
+    expect(parsed.success).toBe(true);
+    const issuer = (parsed as { data: { issuer: Record<string, unknown> } })
+      .data.issuer;
+    expect((issuer.image as { type: unknown }).type).toEqual(['Image']);
   });
 });
