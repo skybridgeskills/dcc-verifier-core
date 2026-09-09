@@ -57,6 +57,22 @@ Verifier results now fold per-suite checks into a single
   `exports` now declare `react-native` / `import` conditions for `.` and
   `./openbadges`, and the package is marked `sideEffects: false`.
 
+### Fixed
+
+- **Valid credentials no longer fail as `INVALID_SIGNATURE` because the verifier
+  rewrote them.** `verifyCredential` / `verifyPresentation` previously ran the
+  suites against the Zod parse output rather than the document the issuer
+  signed. Zod's `.passthrough()` does not extend into nested object schemas, so
+  `IssuerObjectSchema` deleted every key on `issuer.image` except `id` and
+  `type` — including `caption`, which Open Badges 3.0 §B.1.13 defines and real
+  issuers populate. Dropping a signed key changes the canonicalized N-Quads and
+  the proof check then fails. The parse result is now discarded and the
+  caller's original object is verified and returned as
+  `result.verifiableCredential`, which also fixes consumers that re-verify that
+  field in a second pass.
+- `issuer.image.type` accepts an array (`['Image']`) as well as a string. The
+  previous string-only union failed the entire credential parse.
+
 ### Deprecated
 
 - `CheckResult.check` and `CheckResult.suite` — use `CheckResult.id` instead.
