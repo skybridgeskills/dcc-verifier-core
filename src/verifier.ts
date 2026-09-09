@@ -19,6 +19,29 @@
  * standalone wrappers in `verify-suite.ts` create a fresh verifier per
  * call and are intended only for one-shot use.
  *
+ * ## INVARIANT: suites see the bytes the issuer signed
+ *
+ * `parseCredential` / `parsePresentation` are validation gates only. Their
+ * output is discarded and the caller's original object is what flows into
+ * `runSuites` and back out as `result.verifiableCredential`.
+ *
+ * Zod rewrites what it parses. `.passthrough()` does not extend into nested
+ * object schemas, so any nested `z.object({...})` deletes the keys it does
+ * not name, and `JsonLdField` rewrites scalars into arrays. Either change
+ * alters the canonicalized N-Quads, which makes a valid proof fail as
+ * `INVALID_SIGNATURE` — a failure that looks like a bad credential and is
+ * actually a bug here. That is not hypothetical: a spec-legal
+ * `issuer.image.caption` was dropped by `IssuerObjectSchema` and rejected
+ * production Open Badges credentials.
+ *
+ * Returning the original object also matters downstream, because consumers
+ * re-verify `result.verifiableCredential` (the async Open Badges pass in
+ * dcc-transaction-service does exactly this). Handing them a rewritten copy
+ * makes the second pass fail where the first passed.
+ *
+ * Suites must therefore tolerate raw JSON-LD shapes rather than assume
+ * normalization: `@context` and `type` may each be a string or an array.
+ *
  * @example
  * ```ts
  * const verifier = createVerifier({ registries: myRegistries });
@@ -117,7 +140,9 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         );
         return finalizeCredentialResult(result, topLevel, timeService);
       }
-      const parsedCredential = parseResult.data;
+      // Zod is a validation gate here, NOT a normalizer: `parseResult.data` is
+      // deliberately discarded. See the invariant in this module's header.
+      const credential = call.credential as VerifiableCredential;
 
       const ctx = buildContext({
         httpGetService,
@@ -142,7 +167,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
       const effectivePhases = expandPhases(requestedPhases);
       const rawChecks = await runSuites(
         suites,
-        { verifiableCredential: parsedCredential },
+        { verifiableCredential: credential },
         ctx,
         { explicitSuiteIds, phases: effectivePhases }
       );
@@ -156,7 +181,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       const result: CredentialVerificationResult = {
         verified: !hasFatalFailures(rawChecks),
-        verifiableCredential: parsedCredential,
+        verifiableCredential: credential,
         normalizedVerifiableCredential: recognized?.normalized,
         recognizedProfile: recognized?.profile,
         results: folded.results,
@@ -181,7 +206,11 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         );
         return finalizePresentationResult(result, topLevel, timeService);
       }
-      const parsedPresentation = parseResult.data;
+      // Same discipline as `verifyCredential`: validate with Zod, then verify
+      // the object the holder actually signed. Using `parseResult.data` here
+      // also handed the recursive `verifyCredential` calls below a rewritten
+      // copy of each embedded credential.
+      const presentation = call.presentation as VerifiablePresentation;
 
       const ctx = buildContext({
         httpGetService,
@@ -208,7 +237,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
       const effectivePhases = expandPhases(requestedPhases);
       const rawPresentationChecks = await runSuites(
         presentationSuites,
-        { verifiablePresentation: parsedPresentation },
+        { verifiablePresentation: presentation },
         ctx,
         { explicitSuiteIds, phases: effectivePhases }
       );
@@ -222,7 +251,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
         { verbose }
       );
 
-      const credentials = extractCredentialsFrom(parsedPresentation);
+      const credentials = extractCredentialsFrom(presentation);
       const credentialResults: CredentialVerificationResult[] = [];
       if (credentials && credentials.length > 0) {
         for (const credential of credentials) {
@@ -249,7 +278,7 @@ export function createVerifier(config: VerifierConfig = {}): Verifier {
 
       const result: PresentationVerificationResult = {
         verified: presentationVerified && allCredentialsVerified,
-        verifiablePresentation: parsedPresentation,
+        verifiablePresentation: presentation,
         presentationResults: foldedPresentation.results,
         credentialResults,
         summary: foldedPresentation.summaries
