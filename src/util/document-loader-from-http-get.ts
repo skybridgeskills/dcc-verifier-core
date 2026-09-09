@@ -60,11 +60,15 @@ export function documentLoaderFromHttpGet(
         if (status < 200 || status >= 300) {
           throw new Error(`HTTP ${status}`);
         }
-        return {
-          contextUrl: null,
-          document: body,
-          documentUrl: url
-        };
+        // Protocol handlers return the document itself;
+        // `JsonLdDocumentLoader` wraps it in the JSON-LD envelope.
+        // GitHub raw (and other text/plain JSON endpoints) arrive as a
+        // string because `BuiltinHttpGetService` only JSON-parses when
+        // Content-Type says json.
+        if (typeof body === 'string') {
+          return JSON.parse(body);
+        }
+        return body;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(`NotFoundError loading "${url}": ${msg}`, { cause: e });
