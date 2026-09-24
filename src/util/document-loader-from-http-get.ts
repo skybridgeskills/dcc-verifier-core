@@ -60,11 +60,24 @@ export function documentLoaderFromHttpGet(
         if (status < 200 || status >= 300) {
           throw new Error(`HTTP ${status}`);
         }
-        return {
-          contextUrl: null,
-          document: body,
-          documentUrl: url
-        };
+        // Return the bare *parsed* document. Two things matter here, and
+        // `httpClientHandler` in security-document-loader gets both right:
+        //
+        // 1. No envelope. `jsonld-document-loader` wraps whatever a protocol
+        //    handler returns into `{ contextUrl, document, documentUrl }`
+        //    itself, so returning one here nests it — callers that unwrap
+        //    `.document` get the inner envelope instead of the document.
+        //
+        // 2. Parse strings. `BuiltinHttpGetService` only parses when the
+        //    response carries a JSON content type, and status lists are
+        //    routinely served as `text/plain` (raw.githubusercontent.com
+        //    does), so the body arrives as a string. `ContextResolver`
+        //    happens to parse strings itself, which is why remote contexts
+        //    survive; document loads such as `checkStatus` do not.
+        //
+        // A body that is a string but not JSON throws inside this try, so it
+        // still surfaces as a wrapped `NotFoundError` for the url.
+        return typeof body === 'string' ? JSON.parse(body) : body;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(`NotFoundError loading "${url}": ${msg}`, { cause: e });
